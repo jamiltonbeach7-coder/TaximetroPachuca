@@ -69,7 +69,7 @@
     }
   </style>
 
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
 
@@ -190,36 +190,36 @@
       <!-- MÉTRICAS EN 3 CAJAS ACCESIBLES -->
       <div class="grid grid-cols-3 gap-2 sm:gap-3 mt-6">
         <!-- Distancia -->
-        <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-2.5 sm:p-3 text-center">
-          <div class="text-[11px] sm:text-xs text-slate-400 font-semibold mb-0.5 flex items-center justify-center gap-1">
+        <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-2 sm:p-3 text-center overflow-hidden">
+          <div class="text-[10px] sm:text-xs text-slate-400 font-semibold mb-0.5 flex items-center justify-center gap-1">
             📏 <span>Distancia</span>
           </div>
-          <div id="distanceDisplay" class="text-lg sm:text-2xl font-black text-slate-100 font-digital">
+          <div id="distanceDisplay" class="text-base sm:text-2xl font-black text-slate-100 font-digital truncate">
             0.00
           </div>
-          <div class="text-[10px] text-slate-400 font-bold uppercase">Kilómetros</div>
+          <div class="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase truncate">Kilómetros</div>
         </div>
 
         <!-- Tiempo Total -->
-        <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-2.5 sm:p-3 text-center">
-          <div class="text-[11px] sm:text-xs text-slate-400 font-semibold mb-0.5 flex items-center justify-center gap-1">
+        <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-2 sm:p-3 text-center overflow-hidden">
+          <div class="text-[10px] sm:text-xs text-slate-400 font-semibold mb-0.5 flex items-center justify-center gap-1">
             ⏱️ <span>Duración</span>
           </div>
-          <div id="totalTimeDisplay" class="text-lg sm:text-2xl font-black text-slate-100 font-digital">
+          <div id="totalTimeDisplay" class="text-base sm:text-2xl font-black text-slate-100 font-digital truncate">
             00:00
           </div>
-          <div class="text-[10px] text-slate-400 font-bold uppercase">Minutos</div>
+          <div class="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase truncate">Minutos</div>
         </div>
 
         <!-- Tiempo Detenido / Tráfico -->
-        <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-2.5 sm:p-3 text-center">
-          <div class="text-[11px] sm:text-xs text-slate-400 font-semibold mb-0.5 flex items-center justify-center gap-1">
+        <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-2 sm:p-3 text-center overflow-hidden">
+          <div class="text-[10px] sm:text-xs text-slate-400 font-semibold mb-0.5 flex items-center justify-center gap-1">
             🚦 <span>Tráfico</span>
           </div>
-          <div id="waitTimeDisplay" class="text-lg sm:text-2xl font-black text-amber-400 font-digital">
+          <div id="waitTimeDisplay" class="text-base sm:text-2xl font-black text-amber-400 font-digital truncate">
             00:00
           </div>
-          <div class="text-[10px] text-slate-400 font-bold uppercase">Detenido</div>
+          <div class="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase truncate">Detenido</div>
         </div>
       </div>
     </div>
@@ -805,6 +805,6 @@
     <span class="bg-slate-950 text-amber-400 px-2 py-0.5 rounded-lg text-[10px]">Actualizar ↻</span>
   </div>
 
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

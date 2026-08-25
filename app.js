@@ -390,8 +390,13 @@ function updateDisplays() {
 }
 
 function formatTime(totalSeconds) {
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
+  const secsInt = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const hours = Math.floor(secsInt / 3600);
+  const mins = Math.floor((secsInt % 3600) / 60);
+  const secs = secsInt % 60;
+  if (hours > 0) {
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
@@ -1313,7 +1318,7 @@ DOM.btnCloseInstallBanner.addEventListener('click', () => {
 // Registrar y Actualizar Service Worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=5').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=6').then((reg) => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
