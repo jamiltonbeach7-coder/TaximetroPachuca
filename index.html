@@ -289,19 +289,23 @@
       </button>
     </div>
 
-    <!-- SECCIÓN DEL MAPA EN VIVO (EXPANDIBLE) -->
-    <section id="mapSection" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm transition-all">
+    <!-- SECCIÓN DEL MAPA EN VIVO -->
+    <section id="mapSection" class="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-md transition-all">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+        <h3 class="text-sm font-black text-slate-100 flex items-center gap-2">
           <span>📍</span>
-          <span>Ruta en Vivo (Pachuca y Zona Metropolitana)</span>
+          <span>Ruta y Seguimiento en Vivo (Pachuca)</span>
         </h3>
-        <button id="btnCloseMap" class="text-xs text-slate-400 hover:text-slate-200 font-semibold">✕ Ocultar</button>
+        <div class="flex items-center space-x-1.5">
+          <button id="btnRecenterMap" class="text-[11px] text-amber-400 font-bold bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-lg border border-slate-700 transition" title="Centrar vehículo en mapa">
+            🎯 Centrar
+          </button>
+        </div>
       </div>
-      <div id="map" class="w-full h-64 sm:h-80 rounded-xl bg-slate-950 border border-slate-800 z-10"></div>
-      <div class="flex justify-between items-center text-[11px] text-slate-400 mt-2">
-        <span id="gpsCoordsText">Lat: --, Lon: --</span>
-        <span id="gpsAccuracyText">Precisión: -- m</span>
+      <div id="map" class="w-full rounded-2xl bg-slate-950 border border-slate-800 shadow-inner"></div>
+      <div class="flex justify-between items-center text-[11px] text-slate-400 mt-2 px-1">
+        <span id="gpsCoordsText" class="font-mono">Lat: 20.1287, Lon: -98.7303</span>
+        <span id="gpsAccuracyText" class="font-mono text-emerald-400 font-bold">Mapa Listo</span>
       </div>
     </section>
 

@@ -550,9 +550,7 @@ function initMapIfNeeded() {
   if (!mapElement) return;
 
   if (mapInstance) {
-    setTimeout(() => {
-      if (mapInstance) mapInstance.invalidateSize(true);
-    }, 50);
+    mapInstance.invalidateSize(true);
     return;
   }
   
@@ -564,28 +562,33 @@ function initMapIfNeeded() {
 
     mapInstance = L.map('map', {
       zoomControl: false,
-      preferCanvas: true
+      preferCanvas: true,
+      fadeAnimation: true,
+      zoomAnimation: true
     }).setView(pachucaCenter, 14);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Tiles de alta resolución y carga rápida optimizados para móviles
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
-      attribution: '© OpenStreetMap'
+      attribution: '© OpenStreetMap, © CARTO',
+      subdomains: 'abcd',
+      keepBuffer: 6
     }).addTo(mapInstance);
 
     L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
 
-    // Marcador del Taxi interactivo
+    // Marcador del Taxi interactivo de alta visibilidad
     const taxiIcon = L.divIcon({
       className: 'custom-taxi-marker',
       html: '<div class="taxi-marker-pin"><div class="taxi-marker-pulse"></div><span>🚕</span></div>',
-      iconSize: [42, 42],
-      iconAnchor: [21, 21]
+      iconSize: [44, 44],
+      iconAnchor: [22, 22]
     });
 
     mapPlannedPolyline = L.polyline([], {
       color: '#38bdf8',
       weight: 4,
-      opacity: 0.5,
+      opacity: 0.6,
       dashArray: '6, 8'
     }).addTo(mapInstance);
 
@@ -598,15 +601,26 @@ function initMapIfNeeded() {
 
     mapTaxiMarker = L.marker(pachucaCenter, { icon: taxiIcon, zIndexOffset: 1000 }).addTo(mapInstance);
 
+    // Observador de cambio de tamaño nativo para móviles (elimina cualquier glitch de 0px)
+    if (window.ResizeObserver) {
+      const resizeObs = new ResizeObserver(() => {
+        if (mapInstance) {
+          mapInstance.invalidateSize({ pan: false });
+        }
+      });
+      resizeObs.observe(mapElement);
+    }
+
     // Manejador de clics en el mapa para fijar Origen y Destino
     mapInstance.on('click', (e) => {
       if (!state.mapPickMode) return;
       handleMapPickClick(e.latlng.lat, e.latlng.lng);
     });
 
-    setTimeout(() => {
-      if (mapInstance) mapInstance.invalidateSize(true);
-    }, 100);
+    // Múltiples pasadas de refresco para compatibilidad total con navegadores móviles
+    setTimeout(() => { if (mapInstance) mapInstance.invalidateSize(true); }, 100);
+    setTimeout(() => { if (mapInstance) mapInstance.invalidateSize(true); }, 400);
+    setTimeout(() => { if (mapInstance) mapInstance.invalidateSize(true); }, 1000);
   } catch (e) {
     console.warn("Leaflet map load error:", e);
   }
@@ -1428,6 +1442,18 @@ function initEventListeners() {
     });
   });
 
+  // Centrar mapa
+  const btnRecenterMap = document.getElementById('btnRecenterMap');
+  if (btnRecenterMap) {
+    btnRecenterMap.addEventListener('click', () => {
+      if (mapInstance && mapTaxiMarker) {
+        mapInstance.invalidateSize(true);
+        const pos = mapTaxiMarker.getLatLng();
+        mapInstance.setView(pos, 15, { animate: true });
+      }
+    });
+  }
+
   // Iniciar GPS
   startGpsTracking();
 
@@ -1441,5 +1467,6 @@ function initEventListeners() {
 // Inicialización cuando carga el documento
 document.addEventListener('DOMContentLoaded', () => {
   initEventListeners();
+  initMapIfNeeded();
   updateDisplays();
 });
