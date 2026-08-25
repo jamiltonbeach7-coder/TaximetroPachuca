@@ -1,0 +1,117 @@
+/* Estilos personalizados y de alta accesibilidad para Taxímetro Pachuca */
+
+:root {
+  --primary-amber: #f59e0b;
+  --primary-emerald: #10b981;
+  --bg-dark: #020617;
+  --card-dark: #0f172a;
+}
+
+/* Tipografía de display estilo taxímetro */
+.font-digital {
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+/* Modos de Color */
+html.light {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+html.light body {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+html.light header {
+  background-color: rgba(255, 255, 255, 0.95);
+  border-color: #e2e8f0;
+}
+
+html.light header button,
+html.light .bg-slate-900,
+html.light .bg-slate-800 {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+  color: #1e293b;
+}
+
+html.light .taximeter-display {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-color: #f59e0b;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+}
+
+html.light .text-slate-100 {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-200 {
+  color: #1e293b !important;
+}
+
+html.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.light .bg-slate-950,
+html.light .bg-slate-950\/60 {
+  background-color: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+html.light #totalFareDisplay {
+  color: #059669;
+}
+
+/* Animaciones y Pulsos */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.4);
+  }
+}
+
+.taximeter-display {
+  animation: pulse-glow 4s infinite ease-in-out;
+}
+
+/* Botones de acción táctil grande */
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* Estilos de Impresión del Ticket */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #ticketCard, #ticketCard * {
+    visibility: visible;
+  }
+  #ticketCard {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 320px;
+    margin: auto;
+    border: none;
+    box-shadow: none;
+    padding: 10px;
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "Taxímetro Pachuca - Abierto y Auditable",
+  "short_name": "Taxímetro Pachuca",
+  "description": "Taxímetro de código abierto, transparente y auditable para Pachuca y la zona metropolitana de Hidalgo.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

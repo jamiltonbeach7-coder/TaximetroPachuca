@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="Taxímetro de código abierto, accesible, transparente y auditable para Pachuca e Hidalgo.">
+  <title>Taxímetro Pachuca | Código Abierto & Auditable</title>
+
+  <!-- PWA Manifest & Icons -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
+
+  <!-- Tailwind CSS CDN for modern responsive utility styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              amber: '#f59e0b',
+              gold: '#fbbf24',
+              dark: '#0f172a',
+              darker: '#020617',
+              card: '#1e293b',
+              cardlight: '#ffffff'
+            }
+          },
+          fontFamily: {
+            digital: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet CSS & JS for OpenStreetMap -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
+
+  <!-- Banner de Instalación Rápida PWA -->
+  <div id="installBanner" class="hidden bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 px-4 py-2.5 shadow-md flex items-center justify-between z-40 sticky top-0">
+    <div class="flex items-center space-x-2">
+      <span class="text-xl">📲</span>
+      <div class="text-xs sm:text-sm font-semibold">
+        <span>¡Instala esta app en tu pantalla para abrirla sin internet!</span>
+      </div>
+    </div>
+    <div class="flex items-center space-x-2">
+      <button id="btnInstallPWA" class="bg-slate-950 text-amber-400 hover:bg-slate-900 px-3 py-1 rounded-lg text-xs font-bold shadow transition">
+        Instalar Ahora
+      </button>
+      <button id="btnCloseInstallBanner" class="text-slate-900 hover:text-black text-base font-bold px-1" aria-label="Cerrar aviso">✕</button>
+    </div>
+  </div>
+
+  <!-- Header Accesible -->
+  <header class="bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-3xl mx-auto flex items-center justify-between">
+      <!-- Logo y Título -->
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl shadow-inner">
+          🚕
+        </div>
+        <div>
+          <h1 class="text-lg font-black tracking-tight text-amber-400 leading-tight flex items-center gap-1.5">
+            Taxímetro Pachuca
+            <span class="text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-1.5 py-0.5 rounded">
+              Auditable
+            </span>
+          </h1>
+          <p class="text-xs text-slate-400 font-medium">Tarifa transparente y comunitaria</p>
+        </div>
+      </div>
+
+      <!-- Acciones de Cabecera -->
+      <div class="flex items-center space-x-2">
+        <!-- Indicador GPS -->
+        <button id="btnGpsStatus" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-semibold hover:border-slate-600 transition" title="Estado de la señal GPS">
+          <span id="gpsPulse" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+          <span id="gpsStatusText" class="text-slate-300">GPS...</span>
+        </button>
+
+        <!-- Botón Modo Claro / Oscuro -->
+        <button id="btnToggleTheme" class="p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-amber-400 hover:border-amber-500/50 transition" title="Cambiar tema visual" aria-label="Cambiar tema visual">
+          ☀️
+        </button>
+
+        <!-- Botón Sonidos -->
+        <button id="btnToggleSound" class="p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-amber-400 hover:border-amber-500/50 transition" title="Activar/Desactivar avisos de audio" aria-label="Alternar sonido">
+          🔊
+        </button>
+
+        <!-- Botón Menú / Ayuda -->
+        <button id="btnOpenHelp" class="p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-amber-400 hover:border-amber-500/50 transition" title="Cómo instalar y usar" aria-label="Ayuda">
+          ❓
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenedor Principal -->
+  <main class="flex-1 max-w-3xl w-full mx-auto p-3 sm:p-4 space-y-4">
+
+    <!-- Selector de Tarifa Activa / Resumen de Regla -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex items-center justify-between shadow-sm">
+      <div class="flex items-center space-x-2">
+        <span class="text-base">🏷️</span>
+        <div>
+          <div class="text-xs text-slate-400 font-medium">Tarifa aplicada:</div>
+          <div id="activeTariffLabel" class="text-xs sm:text-sm font-bold text-amber-400">
+            Pachuca 2026 ($50.00 base / 4km + $4.50/km)
+          </div>
+        </div>
+      </div>
+      <button id="btnChangeTariff" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+        Cambiar ⚙️
+      </button>
+    </div>
+
+    <!-- PANTALLA PRINCIPAL DEL TAXÍMETRO (LED / DIGITAL GRANDE) -->
+    <div class="relative bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-amber-500/30 rounded-3xl p-5 sm:p-7 shadow-2xl overflow-hidden taximeter-display">
+      
+      <!-- Fondo sutil de textura LED -->
+      <div class="absolute inset-0 bg-[radial-gradient(#f59e0b_1px,transparent_1px)] [background-size:16px_16px] opacity-5 pointer-events-none"></div>
+
+      <!-- Estado en Lenguaje Claro -->
+      <div class="flex items-center justify-between mb-4">
+        <div id="statusBadge" class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs sm:text-sm font-bold bg-slate-800 border border-slate-700 text-slate-300">
+          <span class="w-2.5 h-2.5 rounded-full bg-slate-500" id="statusDot"></span>
+          <span id="statusLabel">Listo para iniciar</span>
+        </div>
+
+        <div class="text-xs font-mono text-slate-400 flex items-center gap-1.5">
+          <span id="screenLockIcon" title="Pantalla siempre encendida">📱 Encendida</span>
+          <span id="speedIndicator" class="bg-slate-800 px-2 py-0.5 rounded text-amber-400 font-bold">0 km/h</span>
+        </div>
+      </div>
+
+      <!-- MONTO TOTAL GIGANTE -->
+      <div class="text-center my-3 sm:my-5">
+        <div class="text-xs uppercase tracking-widest text-slate-400 font-bold mb-1">Monto a pagar</div>
+        <div class="flex items-baseline justify-center">
+          <span class="text-3xl sm:text-4xl font-black text-amber-400 mr-1">$</span>
+          <span id="totalFareDisplay" class="text-6xl sm:text-7xl md:text-8xl font-black text-emerald-400 tracking-tight font-digital">
+            50.00
+          </span>
+          <span class="text-sm sm:text-base font-bold text-slate-400 ml-2">MXN</span>
+        </div>
+        <div id="fareFormulaHint" class="text-xs text-slate-400 mt-2 font-medium">
+          Incluye banderazo inicial (cubre hasta 4.0 km)
+        </div>
+      </div>
+
+      <!-- MÉTRICAS EN 3 CAJAS ACCESIBLES -->
+      <div class="grid grid-cols-3 gap-2 sm:gap-3 mt-6">
+        <!-- Distancia -->
+        <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-2.5 sm:p-3 text-center">
+          <div class="text-[11px] sm:text-xs text-slate-400 font-semibold mb-0.5 flex items-center justify-center gap-1">
+            📏 <span>Distancia</span>
+          </div>
+          <div id="distanceDisplay" class="text-lg sm:text-2xl font-black text-slate-100 font-digital">
+            0.00
+          </div>
+          <div class="text-[10px] text-slate-400 font-bold uppercase">Kilómetros</div>
+        </div>
+
+        <!-- Tiempo Total -->
+        <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-2.5 sm:p-3 text-center">
+          <div class="text-[11px] sm:text-xs text-slate-400 font-semibold mb-0.5 flex items-center justify-center gap-1">
+            ⏱️ <span>Duración</span>
+          </div>
+          <div id="totalTimeDisplay" class="text-lg sm:text-2xl font-black text-slate-100 font-digital">
+            00:00
+          </div>
+          <div class="text-[10px] text-slate-400 font-bold uppercase">Minutos</div>
+        </div>
+
+        <!-- Tiempo Detenido / Tráfico -->
+        <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-2.5 sm:p-3 text-center">
+          <div class="text-[11px] sm:text-xs text-slate-400 font-semibold mb-0.5 flex items-center justify-center gap-1">
+            🚦 <span>Tráfico</span>
+          </div>
+          <div id="waitTimeDisplay" class="text-lg sm:text-2xl font-black text-amber-400 font-digital">
+            00:00
+          </div>
+          <div class="text-[10px] text-slate-400 font-bold uppercase">Detenido</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTONES DE ACCIÓN PRINCIPALES (GIGANTES Y SIN CONFUSIÓN) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="controlButtonsContainer">
+      <!-- Botón Iniciar Viaje -->
+      <button id="btnStartRide" class="w-full py-4 px-6 rounded-2xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 text-xl font-black shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-3 transition-all duration-150">
+        <span class="text-2xl">▶️</span>
+        <span>INICIAR VIAJE</span>
+      </button>
+
+      <!-- Botón Pausar / Reanudar (Oculto al inicio) -->
+      <button id="btnPauseRide" class="hidden w-full py-4 px-6 rounded-2xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 text-xl font-black shadow-lg shadow-amber-500/25 flex items-center justify-center gap-3 transition-all duration-150">
+        <span class="text-2xl" id="pauseIcon">⏸️</span>
+        <span id="pauseText">PAUSAR</span>
+      </button>
+
+      <!-- Botón Finalizar Viaje (Oculto al inicio) -->
+      <button id="btnFinishRide" class="hidden w-full py-4 px-6 rounded-2xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white text-xl font-black shadow-lg shadow-rose-600/25 flex items-center justify-center gap-3 transition-all duration-150">
+        <span class="text-2xl">⏹️</span>
+        <span>TERMINAR VIAJE</span>
+      </button>
+
+      <!-- Botón Nuevo Viaje (Solo cuando terminó) -->
+      <button id="btnResetRide" class="hidden w-full py-4 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-lg font-bold border border-slate-700 flex items-center justify-center gap-2 transition">
+        <span>🔄</span>
+        <span>NUEVO VIAJE</span>
+      </button>
+    </div>
+
+    <!-- TARJETA DE AUDITORÍA Y TRANSPARENCIA COMUNITARIA -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+          <span>🔍</span>
+          <span>Auditoría en Vivo del Cobro</span>
+        </h2>
+        <span class="text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded font-mono font-bold">100% Auditable</span>
+      </div>
+
+      <!-- Desglose Paso a Paso -->
+      <div class="space-y-2 text-xs sm:text-sm text-slate-300 font-mono bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+        <div class="flex justify-between items-center py-0.5">
+          <span class="text-slate-400">1. Banderazo inicial (incluye hasta <span id="auditBaseKm">4.0</span> km):</span>
+          <span class="font-bold text-slate-200">$<span id="auditBaseFare">50.00</span></span>
+        </div>
+        <div class="flex justify-between items-center py-0.5">
+          <span class="text-slate-400">2. Km adicional (<span id="auditExtraKm">0.00</span> km × $<span id="auditPriceKm">4.50</span>):</span>
+          <span class="font-bold text-slate-200">$<span id="auditExtraDistFare">0.00</span></span>
+        </div>
+        <div class="flex justify-between items-center py-0.5">
+          <span class="text-slate-400">3. Tiempo en tráfico/espera (<span id="auditWaitMin">0</span> min × $<span id="auditPriceMin">1.00</span>):</span>
+          <span class="font-bold text-slate-200">$<span id="auditExtraWaitFare">0.00</span></span>
+        </div>
+        <div id="auditNightRow" class="hidden flex justify-between items-center py-0.5 text-amber-400">
+          <span>4. Recargo nocturno (+<span id="auditNightPct">20</span>%):</span>
+          <span class="font-bold">+$<span id="auditNightFare">0.00</span></span>
+        </div>
+        <div class="border-t border-slate-700 pt-2 flex justify-between items-center text-sm sm:text-base font-sans font-bold text-emerald-400">
+          <span>Total Exacto Calculado:</span>
+          <span class="font-digital text-lg">$<span id="auditTotalFare">50.00</span> MXN</span>
+        </div>
+      </div>
+      
+      <p class="text-[11px] text-slate-400 mt-2">
+        💡 <strong>¿Por qué este cálculo?</strong> Puedes consultar la fórmula matemática completa, comprobar el código fuente abierto y verificar el registro de GPS del trayecto.
+      </p>
+    </section>
+
+    <!-- ACCIONES RÁPIDAS DE UTILIDAD -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <!-- Botón Ver Mapa -->
+      <button id="btnToggleMap" class="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-center flex flex-col items-center justify-center transition">
+        <span class="text-xl mb-1">🗺️</span>
+        <span class="text-xs font-bold text-slate-200">Ver Mapa GPS</span>
+      </button>
+
+      <!-- Botón Estimador Previo -->
+      <button id="btnOpenEstimator" class="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-center flex flex-col items-center justify-center transition">
+        <span class="text-xl mb-1">🧮</span>
+        <span class="text-xs font-bold text-slate-200">Calcular Antes</span>
+      </button>
+
+      <!-- Botón Compartir Viaje / Seguridad -->
+      <button id="btnShareTrip" class="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-center flex flex-col items-center justify-center transition">
+        <span class="text-xl mb-1">🛡️</span>
+        <span class="text-xs font-bold text-slate-200">Compartir SOS</span>
+      </button>
+
+      <!-- Botón Generar Ticket -->
+      <button id="btnGenerateTicket" class="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-center flex flex-col items-center justify-center transition">
+        <span class="text-xl mb-1">🧾</span>
+        <span class="text-xs font-bold text-slate-200">Ver Ticket</span>
+      </button>
+    </div>
+
+    <!-- SECCIÓN DEL MAPA EN VIVO (EXPANDIBLE) -->
+    <section id="mapSection" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm transition-all">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+          <span>📍</span>
+          <span>Ruta en Vivo (Pachuca y Zona Metropolitana)</span>
+        </h3>
+        <button id="btnCloseMap" class="text-xs text-slate-400 hover:text-slate-200 font-semibold">✕ Ocultar</button>
+      </div>
+      <div id="map" class="w-full h-64 sm:h-80 rounded-xl bg-slate-950 border border-slate-800 z-10"></div>
+      <div class="flex justify-between items-center text-[11px] text-slate-400 mt-2">
+        <span id="gpsCoordsText">Lat: --, Lon: --</span>
+        <span id="gpsAccuracyText">Precisión: -- m</span>
+      </div>
+    </section>
+
+    <!-- MODO SIMULADOR DE PRUEBA (PARA QUIENES QUIEREN PROBAR SIN SALIR) -->
+    <section class="bg-gradient-to-r from-slate-900 to-slate-900/60 border border-slate-800 rounded-2xl p-3.5">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <div class="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+            <span>🎮</span>
+            <span>Modo de Prueba / Demostración</span>
+          </div>
+          <p class="text-[11px] text-slate-400">
+            ¿Estás en tu casa o computadora? Simula un viaje de prueba por Pachuca (Reloj Monumental a Plaza Galerías).
+          </p>
+        </div>
+        <button id="btnStartSimulation" class="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 text-xs font-bold transition whitespace-nowrap">
+          Iniciar Simulación 🚀
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer con Créditos Abiertos y Enlaces Auditables -->
+  <footer class="bg-slate-900 border-t border-slate-800 py-4 px-4 text-center text-xs text-slate-400">
+    <div class="max-w-3xl mx-auto space-y-2">
+      <p class="flex items-center justify-center gap-2 flex-wrap">
+        <span>Código 100% libre para la comunidad de Hidalgo</span>
+        <span>•</span>
+        <a href="https://github.com/jamiltonbeach7-coder/TaximetroPachuca.com" target="_blank" rel="noopener" class="text-amber-400 hover:underline font-semibold">
+          GitHub Repositorio
+        </a>
+        <span>•</span>
+        <button id="btnOpenTariffModal" class="text-amber-400 hover:underline font-semibold">
+          Reglas de Tarifas
+        </button>
+      </p>
+      <p class="text-[11px] text-slate-500">
+        Iniciativa ciudadana para fomentar cobros justos, seguros y transparentes entre pasajeros y conductores.
+      </p>
+    </div>
+  </footer>
+
+  <!-- ==================== MODALES ACCESIBLES ==================== -->
+
+  <!-- 1. MODAL DE CAMBIO Y CONFIGURACIÓN DE TARIFAS -->
+  <div id="tariffModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-black text-amber-400 flex items-center gap-2">
+          <span>⚙️</span>
+          <span>Configuración de Tarifas</span>
+        </h3>
+        <button id="btnCloseTariffModal" class="text-slate-400 hover:text-white text-xl font-bold">✕</button>
+      </div>
+
+      <p class="text-xs text-slate-300 leading-relaxed">
+        Selecciona la tarifa acordada o introduce una tarifa personalizada para auditar el viaje con exactitud:
+      </p>
+
+      <!-- Opciones Predefinidas -->
+      <div class="space-y-2.5">
+        <!-- Opción 1: Propuesta FUTVEH / Pachuca 2026 -->
+        <label class="block p-3 rounded-xl border border-slate-700 bg-slate-800/60 cursor-pointer hover:border-amber-500/50 transition">
+          <div class="flex items-start gap-2.5">
+            <input type="radio" name="tariffPreset" value="pachuca_2026" checked class="mt-1 accent-amber-500 text-amber-500">
+            <div>
+              <div class="text-sm font-bold text-slate-100">Propuesta Pachuca ($50.00 base)</div>
+              <div class="text-xs text-slate-400 mt-0.5">
+                Banderazo: <strong>$50.00</strong> (cubre primeros 4.0 km)<br>
+                Km adicional: <strong>$4.50</strong> | Minuto en tráfico: <strong>$1.00</strong>
+              </div>
+            </div>
+          </div>
+        </label>
+
+        <!-- Opción 2: Histórica Taxi Contigo -->
+        <label class="block p-3 rounded-xl border border-slate-700 bg-slate-800/60 cursor-pointer hover:border-amber-500/50 transition">
+          <div class="flex items-start gap-2.5">
+            <input type="radio" name="tariffPreset" value="historica" class="mt-1 accent-amber-500 text-amber-500">
+            <div>
+              <div class="text-sm font-bold text-slate-100">Referencia Histórica ($38.50 base)</div>
+              <div class="text-xs text-slate-400 mt-0.5">
+                Banderazo: <strong>$38.50</strong> (cubre primeros 4.0 km)<br>
+                Km adicional: <strong>$3.50</strong> | Minuto en tráfico: <strong>$1.00</strong>
+              </div>
+            </div>
+          </div>
+        </label>
+
+        <!-- Opción 3: Personalizada -->
+        <label class="block p-3 rounded-xl border border-slate-700 bg-slate-800/60 cursor-pointer hover:border-amber-500/50 transition">
+          <div class="flex items-start gap-2.5">
+            <input type="radio" name="tariffPreset" value="custom" class="mt-1 accent-amber-500 text-amber-500">
+            <div>
+              <div class="text-sm font-bold text-slate-100">Personalizada / Otro Municipio</div>
+              <div class="text-xs text-slate-400 mt-0.5">Configura tus propios valores de banderazo y costo por km.</div>
+            </div>
+          </div>
+        </label>
+      </div>
+
+      <!-- Campos de Tarifa Personalizada (Expandible) -->
+      <div id="customTariffFields" class="hidden space-y-3 bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-slate-400 font-semibold mb-1">Banderazo ($ MXN)</label>
+            <input type="number" id="inputCustomBase" step="0.5" value="50.00" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-bold focus:border-amber-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-slate-400 font-semibold mb-1">Km incluidos en base</label>
+            <input type="number" id="inputCustomBaseKm" step="0.1" value="4.0" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-bold focus:border-amber-500 outline-none">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-slate-400 font-semibold mb-1">$ por Km Extra</label>
+            <input type="number" id="inputCustomExtraKm" step="0.25" value="4.50" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-bold focus:border-amber-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-slate-400 font-semibold mb-1">$ por Min Tráfico</label>
+            <input type="number" id="inputCustomMinWait" step="0.25" value="1.00" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-bold focus:border-amber-500 outline-none">
+          </div>
+        </div>
+      </div>
+
+      <!-- Interruptor Horario Nocturno -->
+      <div class="flex items-center justify-between p-3 bg-slate-800/80 rounded-xl border border-slate-700">
+        <div>
+          <div class="text-xs font-bold text-slate-200">🌙 Tarifa Nocturna (+20%)</div>
+          <div class="text-[11px] text-slate-400">Aplica habitualmente de 22:00 a 05:00 hrs</div>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="toggleNightFare" class="sr-only peer">
+          <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+        </label>
+      </div>
+
+      <button id="btnSaveTariff" class="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl transition">
+        Guardar Tarifa
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. MODAL ESTIMADOR PREVIO DE VIAJE -->
+  <div id="estimatorModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-black text-amber-400 flex items-center gap-2">
+          <span>🧮</span>
+          <span>Calculadora Previa de Viaje</span>
+        </h3>
+        <button id="btnCloseEstimatorModal" class="text-slate-400 hover:text-white text-xl font-bold">✕</button>
+      </div>
+
+      <p class="text-xs text-slate-300 leading-relaxed">
+        Calcula cuánto debería costar tu taxi <strong>antes de subirte</strong> para negociar con tranquilidad y evitar sorpresas:
+      </p>
+
+      <div class="space-y-3">
+        <!-- Rutas Frecuentes en Pachuca -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Rutas frecuentes en Pachuca:</label>
+          <select id="selectQuickRoute" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none focus:border-amber-500">
+            <option value="">-- Elige una ruta de ejemplo --</option>
+            <option value="3.2">Centro (Reloj) a Central de Autobuses (~3.2 km)</option>
+            <option value="6.5">Centro a Plaza Galerías (~6.5 km)</option>
+            <option value="8.0">Centro a Hospital General / La Paz (~8.0 km)</option>
+            <option value="12.5">Pachuca Centro a Real del Monte (~12.5 km)</option>
+            <option value="9.0">Plaza Explanada a Centro (~9.0 km)</option>
+            <option value="11.0">Pachuca a San Agustín Tlaxiaca (~11.0 km)</option>
+          </select>
+        </div>
+
+        <!-- Distancia Manual -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">O ingresa los kilómetros aproximados:</label>
+          <div class="flex items-center space-x-2">
+            <input type="number" id="estimatorKmInput" step="0.5" min="0.5" max="100" placeholder="Ej. 5.5" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 font-bold outline-none focus:border-amber-500">
+            <span class="text-xs font-bold text-slate-400">km</span>
+          </div>
+        </div>
+
+        <!-- Estimado de Tráfico -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Nivel de tráfico esperado:</label>
+          <div class="grid grid-cols-3 gap-2 text-xs font-bold">
+            <label class="p-2 rounded-xl bg-slate-800 border border-slate-700 text-center cursor-pointer hover:border-amber-500">
+              <input type="radio" name="trafficLevel" value="0" checked class="sr-only">
+              <div class="text-emerald-400">🟢 Fluido</div>
+              <div class="text-[10px] text-slate-400 font-normal">0 min espera</div>
+            </label>
+            <label class="p-2 rounded-xl bg-slate-800 border border-slate-700 text-center cursor-pointer hover:border-amber-500">
+              <input type="radio" name="trafficLevel" value="5" class="sr-only">
+              <div class="text-amber-400">🟡 Medio</div>
+              <div class="text-[10px] text-slate-400 font-normal">+5 min espera</div>
+            </label>
+            <label class="p-2 rounded-xl bg-slate-800 border border-slate-700 text-center cursor-pointer hover:border-amber-500">
+              <input type="radio" name="trafficLevel" value="15" class="sr-only">
+              <div class="text-rose-400">🔴 Pesado</div>
+              <div class="text-[10px] text-slate-400 font-normal">+15 min espera</div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Resultado Estimado -->
+        <div class="bg-emerald-950/40 border border-emerald-500/40 p-4 rounded-2xl text-center space-y-1">
+          <div class="text-xs uppercase font-bold text-emerald-400">Tarifa Estimada Justa</div>
+          <div class="text-3xl font-black text-emerald-400 font-digital" id="estimatorResultPrice">$50.00 MXN</div>
+          <div class="text-[11px] text-slate-300" id="estimatorResultBreakdown">Banderazo base ($50) cubre los primeros 4 km.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. MODAL DE TICKET / COMPROBANTE DE VIAJE -->
+  <div id="ticketModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-black text-amber-400 flex items-center gap-2">
+          <span>🧾</span>
+          <span>Comprobante de Viaje</span>
+        </h3>
+        <button id="btnCloseTicketModal" class="text-slate-400 hover:text-white text-xl font-bold">✕</button>
+      </div>
+
+      <!-- Ticket Físico Digital -->
+      <div id="ticketCard" class="bg-white text-slate-900 p-5 rounded-2xl shadow font-mono text-xs space-y-3 border-t-8 border-amber-500">
+        <div class="text-center border-b border-dashed border-slate-400 pb-3">
+          <div class="font-black text-sm uppercase tracking-wide">COMPROBANTE DE TAXI</div>
+          <div class="text-[10px] text-slate-600">PACHUCA DE SOTO, HIDALGO</div>
+          <div class="text-[10px] text-slate-500" id="ticketDate">24/08/2026 20:45</div>
+          <div class="text-[9px] text-slate-400 mt-1 font-mono">ID VIAJE: <span id="ticketRideId">TX-0000</span></div>
+        </div>
+
+        <div class="space-y-1 py-1">
+          <div class="flex justify-between">
+            <span class="text-slate-600">Distancia Recorrida:</span>
+            <span class="font-bold" id="ticketDistance">0.00 km</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-600">Duración Total:</span>
+            <span class="font-bold" id="ticketDuration">00:00 min</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-600">Tiempo en Tráfico/Espera:</span>
+            <span class="font-bold" id="ticketWaitTime">00:00 min</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-600">Tarifa Aplicada:</span>
+            <span class="font-bold" id="ticketTariffName">Pachuca $50 Base</span>
+          </div>
+        </div>
+
+        <div class="border-t border-dashed border-slate-400 pt-2 space-y-1 text-[11px]">
+          <div class="flex justify-between">
+            <span>Banderazo Inicial (4 km):</span>
+            <span id="ticketBaseFare">$50.00</span>
+          </div>
+          <div class="flex justify-between">
+            <span>Km Adicionales:</span>
+            <span id="ticketExtraKmFare">$0.00</span>
+          </div>
+          <div class="flex justify-between">
+            <span>Espera / Tráfico:</span>
+            <span id="ticketWaitFare">$0.00</span>
+          </div>
+          <div class="flex justify-between text-base font-black border-t border-slate-900 pt-2">
+            <span>TOTAL:</span>
+            <span id="ticketTotalFare" class="text-emerald-700">$50.00 MXN</span>
+          </div>
+        </div>
+
+        <div class="text-center border-t border-dashed border-slate-400 pt-2 text-[9px] text-slate-500">
+          Cálculo auditable y transparente.<br>
+          taximetro-pachuca.github.io
+        </div>
+      </div>
+
+      <!-- Acciones del Ticket -->
+      <div class="space-y-2">
+        <button id="btnShareTicketWhatsApp" class="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl flex items-center justify-center gap-2 transition">
+          <span>💬</span>
+          <span>Compartir Recibo por WhatsApp</span>
+        </button>
+        <button id="btnPrintTicket" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs flex items-center justify-center gap-2 border border-slate-700 transition">
+          <span>🖨️</span>
+          <span>Imprimir / Guardar en PDF</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. MODAL DE AYUDA Y GUÍA DE INSTALACIÓN PARA USUARIOS NO TÉCNICOS -->
+  <div id="helpModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-black text-amber-400 flex items-center gap-2">
+          <span>💡</span>
+          <span>Guía de Uso e Instalación</span>
+        </h3>
+        <button id="btnCloseHelpModal" class="text-slate-400 hover:text-white text-xl font-bold">✕</button>
+      </div>
+
+      <!-- Explicación sencilla -->
+      <div class="space-y-4 text-xs sm:text-sm text-slate-300">
+        
+        <div class="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700 space-y-1.5">
+          <h4 class="font-bold text-amber-400 text-sm flex items-center gap-1.5">
+            <span>🚕</span> ¿Cómo funciona durante un viaje?
+          </h4>
+          <ol class="list-decimal list-inside space-y-1 text-slate-300 text-xs">
+            <li>Al subirte al taxi, presiona el botón verde grande <strong>"INICIAR VIAJE"</strong>.</li>
+            <li>El taxímetro usará el GPS de tu celular para medir la distancia exacta y el tiempo detenido en semáforos.</li>
+            <li>La pantalla se mantendrá encendida automáticamente para que no se bloquee.</li>
+            <li>Al llegar a tu destino, presiona <strong>"TERMINAR VIAJE"</strong> para ver el cobro exacto y compartir tu ticket.</li>
+          </ol>
+        </div>
+
+        <div class="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700 space-y-2">
+          <h4 class="font-bold text-emerald-400 text-sm flex items-center gap-1.5">
+            <span>📲</span> ¿Cómo instalarlo como App en tu celular?
+          </h4>
+          
+          <div class="space-y-2 text-xs">
+            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+              <strong class="text-amber-400 block mb-1">En Android (Google Chrome):</strong>
+              Toca los <strong>3 puntos (⋮)</strong> arriba a la derecha en Chrome y selecciona <strong>"Instalar aplicación"</strong> o <strong>"Añadir a la pantalla principal"</strong>.
+            </div>
+
+            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+              <strong class="text-amber-400 block mb-1">En iPhone (Safari):</strong>
+              Toca el botón de <strong>Compartir (icono del cuadro con flecha hacia arriba)</strong> abajo en Safari y elige <strong>"Agregar a Inicio" (+)</strong>.
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700 space-y-1">
+          <h4 class="font-bold text-sky-400 text-sm flex items-center gap-1.5">
+            <span>🔒</span> 100% Abierto y Seguro
+          </h4>
+          <p class="text-xs text-slate-400">
+            Esta aplicación no almacena tus datos en servidores externos. Toda la información de tu ubicación permanece en tu propio dispositivo móvil.
+          </p>
+        </div>
+
+      </div>
+
+      <button id="btnCloseHelpBtn" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold rounded-xl transition">
+        Entendido
+      </button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
