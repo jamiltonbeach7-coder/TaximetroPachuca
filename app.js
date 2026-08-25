@@ -164,7 +164,6 @@ const DOM = {
   // Mapa
   mapSection: document.getElementById('mapSection'),
   btnToggleMap: document.getElementById('btnToggleMap'),
-  btnCloseMap: document.getElementById('btnCloseMap'),
   gpsCoordsText: document.getElementById('gpsCoordsText'),
   gpsAccuracyText: document.getElementById('gpsAccuracyText'),
 
@@ -632,7 +631,7 @@ function updateMapPosition(lat, lon, follow = true) {
     mapTaxiMarker.setLatLng([lat, lon]);
   }
   if (follow) {
-    mapInstance.panTo([lat, lon], { animate: true, duration: 0.25, easeLinearity: 0.5 });
+    mapInstance.panTo([lat, lon], { animate: false });
   }
 }
 
@@ -932,8 +931,9 @@ async function startSimulationRide() {
     DOM.simTrafficText.textContent = `Avanzando sobre asfalto a ${Math.round(currentSpeed)} km/h`;
     setVisualStatus('moving', `🚕 ${currentPoint.street} (${Math.round(currentSpeed)} km/h)`);
 
-    // Actualizar Mapa
-    updateMapPosition(nextPoint.lat, nextPoint.lon, true);
+    // Actualizar Mapa (mover el taxi en cada paso y recentrar el mapa suavemente)
+    const shouldPan = (index % 3 === 0);
+    updateMapPosition(nextPoint.lat, nextPoint.lon, shouldPan);
     if (mapRoutePolyline) {
       mapRoutePolyline.addLatLng([nextPoint.lat, nextPoint.lon]);
     }
@@ -1313,7 +1313,7 @@ DOM.btnCloseInstallBanner.addEventListener('click', () => {
 // Registrar y Actualizar Service Worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=3').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=4').then((reg) => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
@@ -1348,118 +1348,128 @@ if ('serviceWorker' in navigator) {
 }
 
 // ==========================================
-// 12. REGISTRO DE EVENTOS (LISTENERS)
+// 12. REGISTRO DE EVENTOS (LISTENERS SEGUROS)
 // ==========================================
 
 function initEventListeners() {
   // Botones de Viaje
-  DOM.btnStartRide.addEventListener('click', startRide);
-  DOM.btnPauseRide.addEventListener('click', togglePauseRide);
-  DOM.btnFinishRide.addEventListener('click', finishRide);
-  DOM.btnResetRide.addEventListener('click', resetRide);
+  if (DOM.btnStartRide) DOM.btnStartRide.addEventListener('click', startRide);
+  if (DOM.btnPauseRide) DOM.btnPauseRide.addEventListener('click', togglePauseRide);
+  if (DOM.btnFinishRide) DOM.btnFinishRide.addEventListener('click', finishRide);
+  if (DOM.btnResetRide) DOM.btnResetRide.addEventListener('click', resetRide);
 
   // Selector y Modal de Tarifas
-  DOM.btnChangeTariff.addEventListener('click', openTariffModal);
-  DOM.btnCloseTariffModal.addEventListener('click', closeTariffModal);
-  DOM.btnSaveTariff.addEventListener('click', saveTariffSettings);
+  if (DOM.btnChangeTariff) DOM.btnChangeTariff.addEventListener('click', openTariffModal);
+  if (DOM.btnCloseTariffModal) DOM.btnCloseTariffModal.addEventListener('click', closeTariffModal);
+  if (DOM.btnSaveTariff) DOM.btnSaveTariff.addEventListener('click', saveTariffSettings);
   
   document.querySelectorAll('input[name="tariffPreset"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
-      if (e.target.value === 'custom') {
-        DOM.customTariffFields.classList.remove('hidden');
-      } else {
-        DOM.customTariffFields.classList.add('hidden');
+      if (DOM.customTariffFields) {
+        if (e.target.value === 'custom') {
+          DOM.customTariffFields.classList.remove('hidden');
+        } else {
+          DOM.customTariffFields.classList.add('hidden');
+        }
       }
     });
   });
 
   // Mapa
-  DOM.btnToggleMap.addEventListener('click', () => {
-    DOM.mapSection.classList.toggle('hidden');
-    initMapIfNeeded();
-    if (mapInstance) {
-      setTimeout(() => mapInstance.invalidateSize(true), 200);
-    }
-  });
-  DOM.btnCloseMap.addEventListener('click', () => {
-    DOM.mapSection.classList.add('hidden');
-  });
+  if (DOM.btnToggleMap) {
+    DOM.btnToggleMap.addEventListener('click', () => {
+      if (DOM.mapSection) {
+        DOM.mapSection.classList.toggle('hidden');
+        initMapIfNeeded();
+        if (mapInstance) {
+          setTimeout(() => mapInstance.invalidateSize(true), 150);
+        }
+      }
+    });
+  }
 
   // Estimador
-  DOM.btnOpenEstimator.addEventListener('click', openEstimatorModal);
-  DOM.btnCloseEstimatorModal.addEventListener('click', closeEstimatorModal);
-  DOM.estimatorKmInput.addEventListener('input', calculateEstimation);
+  if (DOM.btnOpenEstimator) DOM.btnOpenEstimator.addEventListener('click', openEstimatorModal);
+  if (DOM.btnCloseEstimatorModal) DOM.btnCloseEstimatorModal.addEventListener('click', closeEstimatorModal);
+  if (DOM.estimatorKmInput) DOM.estimatorKmInput.addEventListener('input', calculateEstimation);
   document.querySelectorAll('input[name="trafficLevel"]').forEach(r => r.addEventListener('change', calculateEstimation));
-  DOM.selectQuickRoute.addEventListener('change', (e) => {
-    if (e.target.value) {
-      DOM.estimatorKmInput.value = e.target.value;
-      calculateEstimation();
-    }
-  });
+  if (DOM.selectQuickRoute) {
+    DOM.selectQuickRoute.addEventListener('change', (e) => {
+      if (e.target.value && DOM.estimatorKmInput) {
+        DOM.estimatorKmInput.value = e.target.value;
+        calculateEstimation();
+      }
+    });
+  }
 
   // Ticket y Compartir
-  DOM.btnGenerateTicket.addEventListener('click', showTicketModal);
-  DOM.btnCloseTicketModal.addEventListener('click', closeTicketModal);
-  DOM.btnShareTicketWhatsApp.addEventListener('click', shareTicketWhatsApp);
-  DOM.btnPrintTicket.addEventListener('click', () => window.print());
-  DOM.btnShareTrip.addEventListener('click', shareTripSafetyWhatsApp);
+  if (DOM.btnGenerateTicket) DOM.btnGenerateTicket.addEventListener('click', showTicketModal);
+  if (DOM.btnCloseTicketModal) DOM.btnCloseTicketModal.addEventListener('click', closeTicketModal);
+  if (DOM.btnShareTicketWhatsApp) DOM.btnShareTicketWhatsApp.addEventListener('click', shareTicketWhatsApp);
+  if (DOM.btnPrintTicket) DOM.btnPrintTicket.addEventListener('click', () => window.print());
+  if (DOM.btnShareTrip) DOM.btnShareTrip.addEventListener('click', shareTripSafetyWhatsApp);
 
   // Ayuda y Guía
-  DOM.btnOpenHelp.addEventListener('click', () => DOM.helpModal.classList.remove('hidden'));
-  DOM.btnCloseHelpModal.addEventListener('click', () => DOM.helpModal.classList.add('hidden'));
-  DOM.btnCloseHelpBtn.addEventListener('click', () => DOM.helpModal.classList.add('hidden'));
+  if (DOM.btnOpenHelp) DOM.btnOpenHelp.addEventListener('click', () => DOM.helpModal && DOM.helpModal.classList.remove('hidden'));
+  if (DOM.btnCloseHelpModal) DOM.btnCloseHelpModal.addEventListener('click', () => DOM.helpModal && DOM.helpModal.classList.add('hidden'));
+  if (DOM.btnCloseHelpBtn) DOM.btnCloseHelpBtn.addEventListener('click', () => DOM.helpModal && DOM.helpModal.classList.add('hidden'));
 
   // Modos y Sonido
-  DOM.btnToggleTheme.addEventListener('click', toggleTheme);
-  DOM.btnToggleSound.addEventListener('click', toggleSound);
+  if (DOM.btnToggleTheme) DOM.btnToggleTheme.addEventListener('click', toggleTheme);
+  if (DOM.btnToggleSound) DOM.btnToggleSound.addEventListener('click', toggleSound);
 
   // Simulación: Iniciar y Detener
-  DOM.btnStartSimulation.addEventListener('click', startSimulationRide);
-  DOM.btnStopSimulation.addEventListener('click', stopSimulation);
+  if (DOM.btnStartSimulation) DOM.btnStartSimulation.addEventListener('click', startSimulationRide);
+  if (DOM.btnStopSimulation) DOM.btnStopSimulation.addEventListener('click', stopSimulation);
 
   // Simulación: Intercambiar Origen y Destino
-  DOM.btnSwapAddresses.addEventListener('click', () => {
-    const tempText = DOM.inputSimOrigin.value;
-    DOM.inputSimOrigin.value = DOM.inputSimDest.value;
-    DOM.inputSimDest.value = tempText;
+  if (DOM.btnSwapAddresses) {
+    DOM.btnSwapAddresses.addEventListener('click', () => {
+      const tempText = DOM.inputSimOrigin.value;
+      DOM.inputSimOrigin.value = DOM.inputSimDest.value;
+      DOM.inputSimDest.value = tempText;
 
-    const tempCoords = state.customOriginCoords;
-    state.customOriginCoords = state.customDestCoords;
-    state.customDestCoords = tempCoords;
-  });
+      const tempCoords = state.customOriginCoords;
+      state.customOriginCoords = state.customDestCoords;
+      state.customDestCoords = tempCoords;
+    });
+  }
 
   // Simulación: Usar GPS en Origen
-  DOM.btnSetOriginFromGps.addEventListener('click', () => {
-    if (state.lastPosition) {
-      state.customOriginCoords = [state.lastPosition.lat, state.lastPosition.lon];
-      DOM.inputSimOrigin.value = `Mi Ubicación GPS (${state.lastPosition.lat.toFixed(4)}, ${state.lastPosition.lon.toFixed(4)})`;
-    } else if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        state.customOriginCoords = [pos.coords.latitude, pos.coords.longitude];
-        DOM.inputSimOrigin.value = `Mi Ubicación GPS (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`;
-      });
-    }
-  });
+  if (DOM.btnSetOriginFromGps) {
+    DOM.btnSetOriginFromGps.addEventListener('click', () => {
+      if (state.lastPosition) {
+        state.customOriginCoords = [state.lastPosition.lat, state.lastPosition.lon];
+        DOM.inputSimOrigin.value = `Mi Ubicación GPS (${state.lastPosition.lat.toFixed(4)}, ${state.lastPosition.lon.toFixed(4)})`;
+      } else if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+          state.customOriginCoords = [pos.coords.latitude, pos.coords.longitude];
+          DOM.inputSimOrigin.value = `Mi Ubicación GPS (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`;
+        });
+      }
+    });
+  }
 
   // Simulación: Activar Selección en Mapa
-  DOM.btnPickOnMap.addEventListener('click', () => {
-    DOM.mapSection.classList.remove('hidden');
-    initMapIfNeeded();
-    state.mapPickMode = true;
-    state.mapPickStep = 'origin';
-    DOM.btnPickOnMap.textContent = "🟢 Toca en el Mapa el Origen";
-    DOM.btnPickOnMap.className = "p-1 px-2 text-[11px] rounded-lg bg-emerald-900 text-emerald-300 border border-emerald-500 font-bold animate-pulse";
-    DOM.mapSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  });
+  if (DOM.btnPickOnMap) {
+    DOM.btnPickOnMap.addEventListener('click', () => {
+      if (DOM.mapSection) DOM.mapSection.classList.remove('hidden');
+      initMapIfNeeded();
+      state.mapPickMode = true;
+      state.mapPickStep = 'origin';
+      DOM.btnPickOnMap.textContent = "🟢 Toca en el Mapa el Origen";
+      DOM.btnPickOnMap.className = "p-1 px-2 text-[11px] rounded-lg bg-emerald-900 text-emerald-300 border border-emerald-500 font-bold animate-pulse";
+      if (DOM.mapSection) DOM.mapSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
 
   // Chips de Lugares Rápidos
   document.querySelectorAll('.chip-place').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', () => {
       const placeName = btn.getAttribute('data-name');
       const lat = parseFloat(btn.getAttribute('data-lat'));
       const lon = parseFloat(btn.getAttribute('data-lon'));
 
-      // Si el origen está vacío, ponerlo en origen; de lo contrario en destino
       if (!DOM.inputSimOrigin.value.trim()) {
         DOM.inputSimOrigin.value = placeName;
         state.customOriginCoords = [lat, lon];
@@ -1477,7 +1487,7 @@ function initEventListeners() {
       if (mapInstance && mapTaxiMarker) {
         mapInstance.invalidateSize(true);
         const pos = mapTaxiMarker.getLatLng();
-        mapInstance.setView(pos, 15, { animate: true });
+        mapInstance.setView(pos, 15, { animate: false });
       }
     });
   }
