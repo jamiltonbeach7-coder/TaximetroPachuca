@@ -2,7 +2,7 @@
 
 Una Aplicación Web Progresiva (PWA) de código abierto, accesible, ultra-intuitiva y auditable para el cálculo transparente de tarifas de taxi en **Pachuca de Soto** y la zona metropolitana del Estado de Hidalgo.
 
-🌐 **Demo en vivo / GitHub Pages**: [https://jamiltonbeach7-coder.github.io/TaximetroPachuca.com](https://jamiltonbeach7-coder.github.io/TaximetroPachuca.com)
+🌐 **Demo en vivo / GitHub Pages**: [https://jamiltonbeach7-coder.github.io/TaximetroPachuca/](https://jamiltonbeach7-coder.github.io/TaximetroPachuca/)
 
 ---
 
@@ -28,7 +28,7 @@ En Pachuca, la ausencia de una regulación generalizada de taxímetros ha genera
 - 🎮 **Modo Simulación de Prueba**: Permite simular un viaje en Pachuca (Centro Histórico / Reloj Monumental hasta Plaza Galerías) para probar la app desde cualquier computadora o casa.
 - 🧾 **Comprobante / Ticket Digital**: Genera un resumen imprimible o compartible con 1 toque a WhatsApp.
 - 🛡️ **Botón SOS / Compartir Ubicación**: Permite enviar tu ubicación y estado del viaje en tiempo real a familiares por WhatsApp.
-- 📴 **100% Offline (PWA)**: Funciona sin señal celular o datos móviles mediante Service Workers.
+- 📴 **100% Offline (PWA)**: Funciona sin consumir datos ni depender de la señal celular mediante Service Workers.
 
 ---
 
@@ -50,10 +50,10 @@ Total Final = Subtotal × (1 + Recargo Nocturno Si Aplica)
 
 ## 🚀 Despliegue en GitHub Pages
 
-1. Sube los archivos a la rama `main` de tu repositorio `TaximetroPachuca.com`.
+1. Sube los archivos a la rama `main` de tu repositorio `TaximetroPachuca`.
 2. En GitHub, ve a **Settings > Pages**.
 3. En **Branch**, selecciona `main` y la carpeta `/ (root)`.
-4. ¡Listo! Tu taxímetro estará disponible en `https://jamiltonbeach7-coder.github.io/TaximetroPachuca.com`.
+4. ¡Listo! Tu taxímetro estará disponible en `https://jamiltonbeach7-coder.github.io/TaximetroPachuca/`.
 
 ---
 
