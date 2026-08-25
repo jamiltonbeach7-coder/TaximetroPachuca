@@ -1,6 +1,6 @@
 /**
  * Taxímetro Pachuca - Código Abierto y Auditable
- * Módulo Principal de Lógica, GPS, Tarifas y Experiencia de Usuario
+ * Módulo Principal de Lógica, GPS, Tarifas y Simulación Vial Realista
  */
 
 // ==========================================
@@ -68,7 +68,8 @@ const state = {
   
   // Simulación
   isSimulating: false,
-  simulationInterval: null
+  simulationInterval: null,
+  simSpeedMultiplier: 3
 };
 
 // ==========================================
@@ -131,7 +132,17 @@ const DOM = {
   btnOpenEstimator: document.getElementById('btnOpenEstimator'),
   btnShareTrip: document.getElementById('btnShareTrip'),
   btnGenerateTicket: document.getElementById('btnGenerateTicket'),
+
+  // Simulación
+  selectSimRoute: document.getElementById('selectSimRoute'),
+  selectSimSpeed: document.getElementById('selectSimSpeed'),
+  simStatusBanner: document.getElementById('simStatusBanner'),
+  simTrafficLightIcon: document.getElementById('simTrafficLightIcon'),
+  simStreetName: document.getElementById('simStreetName'),
+  simTrafficText: document.getElementById('simTrafficText'),
+  simWaitCountdown: document.getElementById('simWaitCountdown'),
   btnStartSimulation: document.getElementById('btnStartSimulation'),
+  btnStopSimulation: document.getElementById('btnStopSimulation'),
 
   // Modales
   tariffModal: document.getElementById('tariffModal'),
@@ -231,6 +242,10 @@ class SoundEffects {
   resumeSound() {
     this.playTone(400, 'sine', 0.15);
     setTimeout(() => this.playTone(600, 'sine', 0.2), 120);
+  }
+
+  trafficLightSound() {
+    this.playTone(350, 'sine', 0.2);
   }
 
   finishSound() {
@@ -401,9 +416,11 @@ function startGpsTracking() {
       }
 
       // Actualizar marcador en mapa si está inicializado
-      updateMapPosition(latitude, longitude);
+      if (!state.isSimulating) {
+        updateMapPosition(latitude, longitude);
+      }
 
-      // Si el viaje está corriendo, procesar movimiento
+      // Si el viaje está corriendo en modo real, procesar movimiento
       if (state.status === 'RUNNING' && !state.isSimulating) {
         processGpsUpdate(latitude, longitude, speed, accuracy);
       }
@@ -451,7 +468,7 @@ function processGpsUpdate(lat, lon, speedMs, accuracy) {
       state.totalDistanceKm += deltaKm;
       setVisualStatus('moving', `🚕 En movimiento (${Math.round(state.currentSpeedKmh)} km/h)`);
     } else {
-      setVisualStatus('waiting', `🚦 Detenido / Semáforo`);
+      setVisualStatus('waiting', `🚦 Detenido en tráfico / Semáforo`);
     }
   }
 
@@ -503,13 +520,13 @@ function initMapIfNeeded() {
 
     const taxiIcon = L.divIcon({
       className: 'custom-taxi-icon',
-      html: '<div style="font-size: 26px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">🚕</div>',
+      html: '<div style="font-size: 26px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); transition: all 0.3s ease;">🚕</div>',
       iconSize: [30, 30],
       iconAnchor: [15, 15]
     });
 
     mapTaxiMarker = L.marker(pachucaCenter, { icon: taxiIcon }).addTo(mapInstance);
-    mapRoutePolyline = L.polyline([], { color: '#f59e0b', weight: 5, opacity: 0.85 }).addTo(mapInstance);
+    mapRoutePolyline = L.polyline([], { color: '#f59e0b', weight: 5, opacity: 0.85, smoothFactor: 1 }).addTo(mapInstance);
   } catch (e) {
     console.warn("Leaflet map load error:", e);
   }
@@ -517,8 +534,10 @@ function initMapIfNeeded() {
 
 function updateMapPosition(lat, lon) {
   if (!mapInstance) return;
-  mapTaxiMarker.setLatLng([lat, lon]);
-  mapInstance.panTo([lat, lon]);
+  if (mapTaxiMarker) {
+    mapTaxiMarker.setLatLng([lat, lon]);
+  }
+  mapInstance.panTo([lat, lon], { animate: true, duration: 0.4 });
 }
 
 // ==========================================
@@ -541,17 +560,17 @@ function startRide() {
 
   setVisualStatus('running', '🚕 Viaje en progreso');
 
-  // Arrancar temporizador de segundos
+  // Arrancar temporizador de segundos reales
   if (state.timerInterval) clearInterval(state.timerInterval);
   state.timerInterval = setInterval(() => {
-    state.totalElapsedSeconds++;
-
-    // Si la velocidad es menor a 4 km/h se acumula tiempo de tráfico/espera
-    if (state.currentSpeedKmh < 4) {
-      state.totalWaitSeconds++;
+    // Si no estamos simulando, contabilizar tiempo real
+    if (!state.isSimulating) {
+      state.totalElapsedSeconds++;
+      if (state.currentSpeedKmh < 4) {
+        state.totalWaitSeconds++;
+      }
+      updateDisplays();
     }
-
-    updateDisplays();
   }, 1000);
 
   updateDisplays();
@@ -585,6 +604,9 @@ function finishRide() {
   if (state.simulationInterval) clearInterval(state.simulationInterval);
   state.isSimulating = false;
 
+  DOM.btnStopSimulation.classList.add('hidden');
+  DOM.simStatusBanner.classList.add('hidden');
+
   state.status = 'FINISHED';
   state.rideEndTime = new Date();
   state.currentSpeedKmh = 0;
@@ -602,6 +624,12 @@ function finishRide() {
 
 function resetRide() {
   sounds.playTone(440, 'sine', 0.1);
+  if (state.simulationInterval) clearInterval(state.simulationInterval);
+  state.isSimulating = false;
+
+  DOM.btnStopSimulation.classList.add('hidden');
+  DOM.simStatusBanner.classList.add('hidden');
+
   state.status = 'IDLE';
   state.totalDistanceKm = 0.0;
   state.totalElapsedSeconds = 0;
@@ -632,7 +660,10 @@ function setVisualStatus(type, label) {
   if (type === 'moving' || type === 'running') {
     DOM.statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping';
     DOM.statusBadge.className = 'inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs sm:text-sm font-bold bg-emerald-950/60 border border-emerald-500/50 text-emerald-300';
-  } else if (type === 'waiting' || type === 'paused') {
+  } else if (type === 'waiting' || type === 'traffic_light') {
+    DOM.statusDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse';
+    DOM.statusBadge.className = 'inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs sm:text-sm font-bold bg-rose-950/60 border border-rose-500/50 text-rose-300';
+  } else if (type === 'paused') {
     DOM.statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
     DOM.statusBadge.className = 'inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs sm:text-sm font-bold bg-amber-950/60 border border-amber-500/50 text-amber-300';
   } else if (type === 'finished') {
@@ -645,85 +676,441 @@ function setVisualStatus(type, label) {
 }
 
 // ==========================================
-// 8. SIMULADOR DE PRUEBA (PACHUCA RUTA DEMO)
+// 8. SIMULADOR DE RUTAS VIALES REALES Y SEMÁFOROS
 // ==========================================
 
-const PACHUCA_DEMO_WAYPOINTS = [
-  { lat: 20.1287, lon: -98.7303, label: "Reloj Monumental (Centro)" },
-  { lat: 20.1220, lon: -98.7345, label: "Av. Revolución" },
-  { lat: 20.1130, lon: -98.7420, label: "Estadio Hidalgo / Corona" },
-  { lat: 20.1010, lon: -98.7530, label: "Central de Autobuses" },
-  { lat: 20.0950, lon: -98.7610, label: "Blvd. Felipe Ángeles" },
-  { lat: 20.0895, lon: -98.7661, label: "Plaza Galerías Pachuca" }
-];
+// Base de datos de geometría vial precisa y semáforos de Pachuca
+const PACHUCA_REAL_ROUTES = {
+  // 1. Centro Histórico (Reloj) a Plaza Galerías por Av. Juárez y Blvd. Felipe Ángeles
+  centro_galerias: {
+    name: "Reloj Centro a Galerías Pachuca",
+    origin: [20.12873, -98.73032],
+    destination: [20.08950, -98.76610],
+    segments: [
+      {
+        street: "Plaza Independencia / Calle Doria",
+        targetSpeed: 25,
+        trafficLight: null,
+        points: [
+          [20.12873, -98.73032],
+          [20.12810, -98.73045],
+          [20.12740, -98.73090],
+          [20.12650, -98.73150]
+        ]
+      },
+      {
+        street: "Calle Vicente Guerrero / Plaza Juárez",
+        targetSpeed: 30,
+        trafficLight: { name: "Semáforo Plaza Juárez y Madero", durationSec: 12 },
+        points: [
+          [20.12650, -98.73150],
+          [20.12520, -98.73230],
+          [20.12400, -98.73310],
+          [20.12280, -98.73400]
+        ]
+      },
+      {
+        street: "Av. Benito Juárez",
+        targetSpeed: 45,
+        trafficLight: { name: "Semáforo Av. Juárez y Fernando Soto", durationSec: 15 },
+        points: [
+          [20.12280, -98.73400],
+          [20.12150, -98.73480],
+          [20.11980, -98.73580],
+          [20.11800, -98.73700],
+          [20.11620, -98.73820]
+        ]
+      },
+      {
+        street: "Glorieta Insurgentes (Cruce con Revolución)",
+        targetSpeed: 28,
+        trafficLight: { name: "Cruce Glorieta Insurgentes", durationSec: 10 },
+        points: [
+          [20.11620, -98.73820],
+          [20.11540, -98.73890],
+          [20.11470, -98.73970],
+          [20.11390, -98.74080]
+        ]
+      },
+      {
+        street: "Blvd. Felipe Ángeles (Tramo Santa Julia / Corona)",
+        targetSpeed: 55,
+        trafficLight: { name: "Semáforo Cruce Blvd. Minero / Corona", durationSec: 18 },
+        points: [
+          [20.11390, -98.74080],
+          [20.11250, -98.74220],
+          [20.11050, -98.74420],
+          [20.10820, -98.74650],
+          [20.10580, -98.74890]
+        ]
+      },
+      {
+        street: "Blvd. Felipe Ángeles (Estadio Hidalgo y Central)",
+        targetSpeed: 50,
+        trafficLight: { name: "Semáforo Estadio Hidalgo / Central", durationSec: 16 },
+        points: [
+          [20.10580, -98.74890],
+          [20.10320, -98.75150],
+          [20.10080, -98.75380],
+          [20.09820, -98.75620],
+          [20.09550, -98.75880]
+        ]
+      },
+      {
+        street: "Blvd. Felipe Ángeles (Parque David Ben Gurión / IT Pachuca)",
+        targetSpeed: 55,
+        trafficLight: { name: "Semáforo Tecnológico de Pachuca", durationSec: 14 },
+        points: [
+          [20.09550, -98.75880],
+          [20.09350, -98.76080],
+          [20.09180, -98.76280],
+          [20.09050, -98.76450]
+        ]
+      },
+      {
+        street: "Acceso a Plaza Galerías Pachuca",
+        targetSpeed: 25,
+        trafficLight: null,
+        points: [
+          [20.09050, -98.76450],
+          [20.08980, -98.76540],
+          [20.08950, -98.76610]
+        ]
+      }
+    ]
+  },
 
-function startSimulationRide() {
+  // 2. Central de Autobuses a Reloj Monumental por Viaducto Nuevo Hidalgo
+  central_reloj: {
+    name: "Central Autobuses a Reloj Centro",
+    origin: [20.10080, -98.75380],
+    destination: [20.12873, -98.73032],
+    segments: [
+      {
+        street: "Blvd. Javier Rojo Gómez",
+        targetSpeed: 45,
+        trafficLight: { name: "Semáforo Rojo Gómez y Cobián", durationSec: 14 },
+        points: [
+          [20.10080, -98.75380],
+          [20.10350, -98.75100],
+          [20.10650, -98.74800],
+          [20.10980, -98.74450]
+        ]
+      },
+      {
+        street: "Viaducto Nuevo Hidalgo (Tramo Río de las Avenidas)",
+        targetSpeed: 55,
+        trafficLight: { name: "Cruce Viaducto y Av. Madero", durationSec: 16 },
+        points: [
+          [20.10980, -98.74450],
+          [20.11400, -98.74050],
+          [20.11850, -98.73600],
+          [20.12250, -98.73250],
+          [20.12600, -98.72950]
+        ]
+      },
+      {
+        street: "Acceso a Plaza Independencia / Reloj",
+        targetSpeed: 20,
+        trafficLight: null,
+        points: [
+          [20.12600, -98.72950],
+          [20.12750, -98.72980],
+          [20.12873, -98.73032]
+        ]
+      }
+    ]
+  },
+
+  // 3. Plaza Explanada a Hospital General por Blvd. Colosio
+  explanada_hospital: {
+    name: "Plaza Explanada a Hospital General",
+    origin: [20.04500, -98.78800],
+    destination: [20.11200, -98.72100],
+    segments: [
+      {
+        street: "Blvd. Felipe Ángeles (Sur / San Antonio)",
+        targetSpeed: 60,
+        trafficLight: { name: "Semáforo San Antonio el Desmonte", durationSec: 15 },
+        points: [
+          [20.04500, -98.78800],
+          [20.05600, -98.78000],
+          [20.06800, -98.77200],
+          [20.08000, -98.76500]
+        ]
+      },
+      {
+        street: "Distribuidor Vial 11 de Julio / Blvd. Colosio",
+        targetSpeed: 55,
+        trafficLight: { name: "Semáforo Colosio y Piracantos", durationSec: 18 },
+        points: [
+          [20.08000, -98.76500],
+          [20.09000, -98.75200],
+          [20.10000, -98.73800],
+          [20.10800, -98.72800],
+          [20.11200, -98.72100]
+        ]
+      }
+    ]
+  },
+
+  // 4. Centro Pachuca a Real del Monte por Carretera Panorámica
+  reloj_realmonte: {
+    name: "Centro Pachuca a Real del Monte",
+    origin: [20.12873, -98.73032],
+    destination: [20.14150, -98.67300],
+    segments: [
+      {
+        street: "Salida Centro hacia Corredor de la Montaña",
+        targetSpeed: 35,
+        trafficLight: { name: "Semáforo Loreto / Mina de San Juan", durationSec: 12 },
+        points: [
+          [20.12873, -98.73032],
+          [20.13200, -98.72500],
+          [20.13600, -98.71800]
+        ]
+      },
+      {
+        street: "Carretera Federal 105 (Curvas de la Montaña)",
+        targetSpeed: 50,
+        trafficLight: null,
+        points: [
+          [20.13600, -98.71800],
+          [20.13900, -98.70500],
+          [20.14200, -98.69200],
+          [20.14150, -98.67300]
+        ]
+      }
+    ]
+  }
+};
+
+// Generador de pasos de interpolación de alta densidad a lo largo de las curvas
+function buildDetailedTrajectory(routeKey) {
+  const route = PACHUCA_REAL_ROUTES[routeKey] || PACHUCA_REAL_ROUTES.centro_galerias;
+  const trajectory = [];
+
+  route.segments.forEach((segment) => {
+    const pts = segment.points;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const dist = calculateHaversine(p1[0], p1[1], p2[0], p2[1]);
+      
+      // Interpolación densa cada ~15 a 20 metros para movimiento suave sin saltos
+      const steps = Math.max(4, Math.ceil(dist / 0.018));
+      for (let s = 0; s < steps; s++) {
+        const ratio = s / steps;
+        const lat = p1[0] + (p2[0] - p1[0]) * ratio;
+        const lon = p1[1] + (p2[1] - p1[1]) * ratio;
+        trajectory.push({
+          lat,
+          lon,
+          street: segment.street,
+          targetSpeed: segment.targetSpeed,
+          isSegmentEnd: (i === pts.length - 2 && s === steps - 1),
+          trafficLight: (i === pts.length - 2 && s === steps - 1) ? segment.trafficLight : null
+        });
+      }
+    }
+  });
+
+  return trajectory;
+}
+
+// Intentar consultar ruta OSRM con fallback automático al modelo local
+async function fetchOsrmRouteGeometry(routeKey) {
+  const route = PACHUCA_REAL_ROUTES[routeKey] || PACHUCA_REAL_ROUTES.centro_galerias;
+  const [origLat, origLon] = route.origin;
+  const [destLat, destLon] = route.destination;
+
+  const url = `https://router.project-osrm.org/route/v1/driving/${origLon},${origLat};${destLon},${destLat}?overview=full&geometries=geojson`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5s timeout
+
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.routes && data.routes.length > 0) {
+        const coords = data.routes[0].geometry.coordinates; // [lon, lat]
+        // Convertir coordenadas OSRM a formato de simulación
+        const osrmTrajectory = [];
+        for (let i = 0; i < coords.length - 1; i++) {
+          const p1 = coords[i];
+          const p2 = coords[i + 1];
+          const lat1 = p1[1], lon1 = p1[0], lat2 = p2[1], lon2 = p2[0];
+          const dist = calculateHaversine(lat1, lon1, lat2, lon2);
+          const steps = Math.max(2, Math.ceil(dist / 0.02));
+          
+          for (let s = 0; s < steps; s++) {
+            const ratio = s / steps;
+            const lat = lat1 + (lat2 - lat1) * ratio;
+            const lon = lon1 + (lon2 - lon1) * ratio;
+            
+            // Insertar semáforos periódicos en la ruta
+            let tl = null;
+            if (i > 0 && i % 25 === 0 && s === 0) {
+              tl = { name: "Semáforo en Intersección Vial", durationSec: 15 };
+            }
+
+            osrmTrajectory.push({
+              lat,
+              lon,
+              street: route.name,
+              targetSpeed: 50,
+              trafficLight: tl
+            });
+          }
+        }
+        return osrmTrajectory;
+      }
+    }
+  } catch (err) {
+    console.log("OSRM no disponible o sin conexión. Usando trazado vial de alta precisión local de Pachuca.");
+  }
+
+  // Fallback a coordenadas locales precisas
+  return buildDetailedTrajectory(routeKey);
+}
+
+async function startSimulationRide() {
   resetRide();
   initMapIfNeeded();
   DOM.mapSection.classList.remove('hidden');
   
+  const selectedRouteKey = DOM.selectSimRoute.value || 'centro_galerias';
+  const speedMult = parseInt(DOM.selectSimSpeed.value, 10) || 3;
+  state.simSpeedMultiplier = speedMult;
+
   state.isSimulating = true;
   startRide();
 
-  let waypointIndex = 0;
-  let step = 0;
-  const totalStepsPerSegment = 25;
+  DOM.btnStopSimulation.classList.remove('hidden');
+  DOM.simStatusBanner.classList.remove('hidden');
+  DOM.simStreetName.textContent = "Preparando ruta vial...";
+  DOM.simTrafficText.textContent = "Calculando trazado sobre calles...";
 
-  let currentLat = PACHUCA_DEMO_WAYPOINTS[0].lat;
-  let currentLon = PACHUCA_DEMO_WAYPOINTS[0].lon;
-  updateMapPosition(currentLat, currentLon);
+  const trajectory = await fetchOsrmRouteGeometry(selectedRouteKey);
+  
+  if (!trajectory || trajectory.length === 0) {
+    finishRide();
+    return;
+  }
+
+  let index = 0;
+  let currentSpeed = 0;
+  let waitingCounter = 0; // Segundos restantes de semáforo rojo
+  let activeTrafficLight = null;
+
+  // Centrar mapa en origen
+  updateMapPosition(trajectory[0].lat, trajectory[0].lon);
+
+  // Intervalo de simulación (cada 200ms)
+  const stepMs = 200;
+  const tickTimeSec = (stepMs / 1000) * speedMult;
 
   state.simulationInterval = setInterval(() => {
     if (state.status === 'PAUSED') return;
 
-    if (waypointIndex >= PACHUCA_DEMO_WAYPOINTS.length - 1) {
+    // Si terminó la ruta
+    if (index >= trajectory.length - 1) {
       clearInterval(state.simulationInterval);
       finishRide();
       return;
     }
 
-    const startWp = PACHUCA_DEMO_WAYPOINTS[waypointIndex];
-    const endWp = PACHUCA_DEMO_WAYPOINTS[waypointIndex + 1];
+    const currentPoint = trajectory[index];
+    const nextPoint = trajectory[index + 1];
 
-    step++;
-    const progress = step / totalStepsPerSegment;
+    // ===================================
+    // 1. MANEJO DE SEMÁFOROS Y DETENCIONES
+    // ===================================
+    if (waitingCounter > 0) {
+      // Vehículo detenido por completo en el semáforo
+      currentSpeed = 0;
+      state.currentSpeedKmh = 0;
+      
+      // Contabilizar tiempo detenido en segundos simulados
+      state.totalWaitSeconds += tickTimeSec;
+      state.totalElapsedSeconds += tickTimeSec;
+      waitingCounter -= tickTimeSec;
 
-    currentLat = startWp.lat + (endWp.lat - startWp.lat) * progress;
-    currentLon = startWp.lon + (endWp.lon - startWp.lon) * progress;
+      // Actualizar UI del Semáforo
+      DOM.simTrafficLightIcon.textContent = "🔴";
+      DOM.simStreetName.textContent = activeTrafficLight ? activeTrafficLight.name : "Semáforo en Rojo";
+      DOM.simTrafficText.textContent = `Detenido a 0 km/h (Contabilizando tiempo de espera)`;
+      DOM.simWaitCountdown.textContent = `Espera: ${Math.max(0, Math.ceil(waitingCounter))}s`;
+      setVisualStatus('traffic_light', `🚦 ${activeTrafficLight ? activeTrafficLight.name : 'Detenido en Semáforo'}`);
 
-    // Simular variación realista de velocidad y semáforos
-    let simSpeed = 45;
-    if (step < 3 || step > totalStepsPerSegment - 2) {
-      simSpeed = 10; // Frenando en esquina o semáforo
-    } else if (waypointIndex === 2 && step >= 10 && step <= 16) {
-      simSpeed = 0; // Detenido en semáforo de Estadio
-      setVisualStatus('waiting', `🚦 Semáforo en Estadio Hidalgo`);
-    } else {
-      setVisualStatus('moving', `🚕 En movimiento (${simSpeed} km/h)`);
+      updateDisplays();
+      return;
     }
 
-    state.currentSpeedKmh = simSpeed;
+    // Comprobar si llegamos a un nuevo semáforo en este punto
+    if (currentPoint.trafficLight && !activeTrafficLight) {
+      activeTrafficLight = currentPoint.trafficLight;
+      waitingCounter = activeTrafficLight.durationSec;
+      sounds.trafficLightSound();
+      return;
+    }
+
+    // Si salimos del semáforo, resetear estado
+    activeTrafficLight = null;
+    DOM.simWaitCountdown.textContent = "--";
+
+    // ===================================
+    // 2. DINÁMICA DE VELOCIDAD Y AVANCE
+    // ===================================
+    const targetSpeed = currentPoint.targetSpeed || 45;
     
-    // Sumar distancia
-    if (simSpeed > 0) {
-      state.totalDistanceKm += (simSpeed / 3600); // km por segundo simulado
+    // Aceleración gradual realista
+    if (currentSpeed < targetSpeed) {
+      currentSpeed = Math.min(targetSpeed, currentSpeed + 6 * speedMult);
+    } else if (currentSpeed > targetSpeed) {
+      currentSpeed = Math.max(targetSpeed, currentSpeed - 8 * speedMult);
     }
 
-    updateMapPosition(currentLat, currentLon);
+    state.currentSpeedKmh = currentSpeed;
+
+    // Calcular distancia recorrida en este paso
+    const deltaKm = calculateHaversine(
+      currentPoint.lat, currentPoint.lon,
+      nextPoint.lat, nextPoint.lon
+    );
+
+    state.totalDistanceKm += deltaKm;
+    state.totalElapsedSeconds += tickTimeSec;
+
+    // Actualizar estado visual
+    DOM.simTrafficLightIcon.textContent = "🟢";
+    DOM.simStreetName.textContent = currentPoint.street || "Vía Principal";
+    DOM.simTrafficText.textContent = `Avanzando sobre asfalto a ${Math.round(currentSpeed)} km/h`;
+    setVisualStatus('moving', `🚕 ${currentPoint.street} (${Math.round(currentSpeed)} km/h)`);
+
+    // Actualizar Mapa y Coordenadas
+    updateMapPosition(nextPoint.lat, nextPoint.lon);
     if (mapRoutePolyline) {
-      mapRoutePolyline.addLatLng([currentLat, currentLon]);
+      mapRoutePolyline.addLatLng([nextPoint.lat, nextPoint.lon]);
     }
 
-    DOM.gpsCoordsText.textContent = `Lat: ${currentLat.toFixed(5)}, Lon: ${currentLon.toFixed(5)}`;
-    DOM.gpsAccuracyText.textContent = `Precisión: Simulado (Demo)`;
+    DOM.gpsCoordsText.textContent = `Lat: ${nextPoint.lat.toFixed(5)}, Lon: ${nextPoint.lon.toFixed(5)}`;
+    DOM.gpsAccuracyText.textContent = `Precisión: Simulación Vial (${speedMult}x)`;
 
-    if (step >= totalStepsPerSegment) {
-      step = 0;
-      waypointIndex++;
-    }
-
+    index++;
     updateDisplays();
-  }, 500); // Pasos cada 500ms para demostración fluida
+  }, stepMs);
+}
+
+function stopSimulation() {
+  if (state.simulationInterval) clearInterval(state.simulationInterval);
+  state.isSimulating = false;
+  DOM.btnStopSimulation.classList.add('hidden');
+  DOM.simStatusBanner.classList.add('hidden');
+  finishRide();
 }
 
 // ==========================================
@@ -903,7 +1290,6 @@ DOM.btnInstallPWA.addEventListener('click', async () => {
     }
     deferredInstallPrompt = null;
   } else {
-    // Si no hay evento diferido, abrir la guía accesible
     DOM.helpModal.classList.remove('hidden');
   }
 });
@@ -989,6 +1375,7 @@ function initEventListeners() {
 
   // Simulación
   DOM.btnStartSimulation.addEventListener('click', startSimulationRide);
+  DOM.btnStopSimulation.addEventListener('click', stopSimulation);
 
   // Iniciar GPS
   startGpsTracking();

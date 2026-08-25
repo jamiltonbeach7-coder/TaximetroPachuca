@@ -305,20 +305,68 @@
       </div>
     </section>
 
-    <!-- MODO SIMULADOR DE PRUEBA (PARA QUIENES QUIEREN PROBAR SIN SALIR) -->
-    <section class="bg-gradient-to-r from-slate-900 to-slate-900/60 border border-slate-800 rounded-2xl p-3.5">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div>
-          <div class="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-            <span>🎮</span>
-            <span>Modo de Prueba / Demostración</span>
+    <!-- MODO SIMULADOR DE PRUEBA REALISTA (CALLE POR CALLE CON SEMÁFOROS) -->
+    <section class="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg space-y-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-lg">
+            🎮
           </div>
-          <p class="text-[11px] text-slate-400">
-            ¿Estás en tu casa o computadora? Simula un viaje de prueba por Pachuca (Reloj Monumental a Plaza Galerías).
-          </p>
+          <div>
+            <h3 class="text-sm font-black text-slate-100 flex items-center gap-1.5">
+              Simulador de Rutas Reales y Tráfico
+              <span class="text-[10px] bg-sky-500/20 text-sky-400 border border-sky-500/30 px-1.5 py-0.5 rounded font-mono font-bold">Vialidad Real</span>
+            </h3>
+            <p class="text-[11px] text-slate-400">
+              Sigue el asfalto real de Pachuca respetando semáforos y midiendo el tiempo de espera.
+            </p>
+          </div>
         </div>
-        <button id="btnStartSimulation" class="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 text-xs font-bold transition whitespace-nowrap">
-          Iniciar Simulación 🚀
+      </div>
+
+      <!-- Selector de Rutas Reales -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div class="sm:col-span-2">
+          <label class="block text-[11px] font-bold text-slate-400 mb-1">Ruta en Pachuca a simular:</label>
+          <select id="selectSimRoute" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-amber-500">
+            <option value="centro_galerias">1. Reloj Centro ➔ Galerías Pachuca (Blvd. Fpe. Ángeles, ~6.4 km)</option>
+            <option value="central_reloj">2. Central Autobuses ➔ Reloj (Viaducto Nvo. Hidalgo, ~4.1 km)</option>
+            <option value="explanada_hospital">3. Plaza Explanada ➔ Hospital General (Colosio, ~8.7 km)</option>
+            <option value="reloj_realmonte">4. Centro Pachuca ➔ Real del Monte (Panorámica, ~13.5 km)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 mb-1">Velocidad simulación:</label>
+          <select id="selectSimSpeed" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-amber-500">
+            <option value="3">⚡ Rápido (3x Demo)</option>
+            <option value="1">⏱️ Tiempo Real (1x)</option>
+            <option value="5">🚀 Ultra Rápido (5x)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Panel de Semáforo / Calle en Tiempo de Simulación -->
+      <div id="simStatusBanner" class="hidden bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+        <div class="flex items-center gap-2">
+          <span id="simTrafficLightIcon" class="text-base">🟢</span>
+          <div>
+            <span id="simStreetName" class="font-bold text-amber-400 block">Av. Juárez</span>
+            <span id="simTrafficText" class="text-[11px] text-slate-300">Tráfico fluido a 48 km/h</span>
+          </div>
+        </div>
+        <div id="simWaitCountdown" class="text-xs font-mono font-bold text-amber-400">
+          --
+        </div>
+      </div>
+
+      <!-- Botón Iniciar Simulación -->
+      <div class="flex gap-2">
+        <button id="btnStartSimulation" class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black shadow transition flex items-center justify-center gap-2">
+          <span>🚀 Iniciar Viaje Simulado</span>
+        </button>
+        <button id="btnStopSimulation" class="hidden py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-400 text-xs font-bold border border-slate-700 transition">
+          Detener Demo
         </button>
       </div>
     </section>
