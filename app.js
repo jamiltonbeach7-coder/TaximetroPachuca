@@ -390,14 +390,15 @@ function updateDisplays() {
 }
 
 function formatTime(totalSeconds) {
-  const secsInt = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const secsInt = Math.floor(Math.max(0, Number(totalSeconds) || 0));
   const hours = Math.floor(secsInt / 3600);
   const mins = Math.floor((secsInt % 3600) / 60);
   const secs = secsInt % 60;
+  const pad = (n) => (n < 10 ? '0' + n : '' + n);
   if (hours > 0) {
-    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    return `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
   }
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  return `${pad(mins)}:${pad(secs)}`;
 }
 
 // ==========================================
@@ -883,8 +884,8 @@ async function startSimulationRide() {
       currentSpeed = 0;
       state.currentSpeedKmh = 0;
       
-      state.totalWaitSeconds += tickTimeSec;
-      state.totalElapsedSeconds += tickTimeSec;
+      state.totalWaitSeconds = Math.round((state.totalWaitSeconds + tickTimeSec) * 100) / 100;
+      state.totalElapsedSeconds = Math.round((state.totalElapsedSeconds + tickTimeSec) * 100) / 100;
       waitingCounter -= tickTimeSec;
 
       DOM.simTrafficLightIcon.textContent = "🔴";
@@ -928,7 +929,7 @@ async function startSimulationRide() {
     );
 
     state.totalDistanceKm += deltaKm;
-    state.totalElapsedSeconds += tickTimeSec;
+    state.totalElapsedSeconds = Math.round((state.totalElapsedSeconds + tickTimeSec) * 100) / 100;
 
     // Actualizar UI
     DOM.simTrafficLightIcon.textContent = "🟢";
@@ -1317,8 +1318,17 @@ DOM.btnCloseInstallBanner.addEventListener('click', () => {
 
 // Registrar y Actualizar Service Worker
 if ('serviceWorker' in navigator) {
+  // Limpiar cachés antiguas si existen
+  if ('caches' in window) {
+    caches.keys().then((keys) => {
+      keys.forEach((key) => {
+        if (key !== 'taximetro-pachuca-v7') caches.delete(key);
+      });
+    });
+  }
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=6').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=7').then((reg) => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;

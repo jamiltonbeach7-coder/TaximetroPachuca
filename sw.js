@@ -1,5 +1,5 @@
-// Service Worker para Taxímetro Pachuca (Versión 6 - Auto-Update & Performance)
-const CACHE_NAME = 'taximetro-pachuca-v6';
+// Service Worker para Taxímetro Pachuca (Versión 7 - Auto-Update & Performance)
+const CACHE_NAME = 'taximetro-pachuca-v7';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
