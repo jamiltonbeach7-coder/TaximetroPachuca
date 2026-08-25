@@ -43,11 +43,6 @@
 
   <!-- Regla crítica para evitar que Tailwind rompa los mosaicos de Leaflet -->
   <style>
-    .leaflet-container img,
-    .leaflet-tile-container img,
-    .leaflet-tile-pane img,
-    .leaflet-pane img,
-    .leaflet-tile,
     .leaflet-marker-icon,
     .leaflet-marker-shadow {
       max-width: none !important;
@@ -57,14 +52,24 @@
       display: inline !important;
       box-shadow: none !important;
     }
-    .leaflet-tile {
-      visibility: inherit !important;
+    .leaflet-container .leaflet-tile-pane img,
+    .leaflet-container .leaflet-tile {
+      max-width: none !important;
+      max-height: none !important;
       width: 256px !important;
       height: 256px !important;
+      visibility: inherit !important;
+      display: block !important;
+      box-shadow: none !important;
+    }
+    .leaflet-container img:not(.leaflet-tile) {
+      max-width: none !important;
+      max-height: none !important;
+      box-shadow: none !important;
     }
   </style>
 
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
 
@@ -800,6 +805,6 @@
     <span class="bg-slate-950 text-amber-400 px-2 py-0.5 rounded-lg text-[10px]">Actualizar ↻</span>
   </div>
 
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

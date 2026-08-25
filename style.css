@@ -97,13 +97,9 @@ button:active {
 
 /* =========================================================
    CORRECCIÓN CRÍTICA: Conflicto de Tailwind CSS con Leaflet
-   Tailwind aplica 'img { max-width: 100% }' que rompe los tiles
+   Tailwind aplica 'img { max-width: 100% }' que rompe los tiles.
+   Separamos tiles de los demás para evitar conflictos de especificidad.
    ========================================================= */
-.leaflet-container img,
-.leaflet-tile-container img,
-.leaflet-tile-pane img,
-.leaflet-pane img,
-.leaflet-tile,
 .leaflet-marker-icon,
 .leaflet-marker-shadow {
   max-width: none !important;
@@ -114,10 +110,23 @@ button:active {
   box-shadow: none !important;
 }
 
-.leaflet-tile {
-  visibility: inherit !important;
+/* Tiles del mapa: necesitan tamaño fijo de 256px para renderizar */
+.leaflet-container .leaflet-tile-pane img,
+.leaflet-container .leaflet-tile {
+  max-width: none !important;
+  max-height: none !important;
   width: 256px !important;
   height: 256px !important;
+  visibility: inherit !important;
+  display: block !important;
+  box-shadow: none !important;
+}
+
+/* Otros elementos de Leaflet (popups, controles, overlays) */
+.leaflet-container img:not(.leaflet-tile) {
+  max-width: none !important;
+  max-height: none !important;
+  box-shadow: none !important;
 }
 
 #map {
