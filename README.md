@@ -32,19 +32,83 @@ En Pachuca, la ausencia de una regulación generalizada de taxímetros ha genera
 
 ---
 
-## 📐 Fórmula de Cálculo Auditable
+## 🧮 Detalle del Código: ¿Dónde y cómo se calcula el costo?
 
-```text
-Distancia Extra (km) = Máximo(0, Distancia Total - Km Base Banderazo)
-Costo Distancia Extra = Distancia Extra × Costo por Km
+El cálculo del costo total se encuentra implementado en el archivo [`app.js`](app.js) dentro de la función **`calculateFare()`** (Líneas 307 a 346).
 
-Minutos Detenido = Piso(Segundos con Velocidad < 4 km/h / 60)
-Costo Espera = Minutos Detenido × Costo por Minuto
+### 📄 Código Fuente de la Función
 
-Subtotal = Banderazo Base + Costo Distancia Extra + Costo Espera
+```javascript
+function calculateFare(distanceKm, waitSeconds, tariff, isNight) {
+  const baseFare = Number(tariff.baseFare) || 50.00;
+  const baseKm = Number(tariff.baseKm) || 4.0;
+  const pricePerKm = Number(tariff.pricePerKm) || 4.50;
+  const pricePerWaitMin = Number(tariff.pricePerWaitMinute) || 1.00;
 
-Total Final = Subtotal × (1 + Recargo Nocturno Si Aplica)
+  // 1. Kilómetros adicionales que exceden el banderazo
+  const extraKm = Math.max(0, distanceKm - baseKm);
+  const extraDistFare = extraKm * pricePerKm;
+
+  // 2. Minutos de espera en semáforos o tráfico detenido
+  const waitMinutes = Math.floor(waitSeconds / 60);
+  const extraWaitFare = waitMinutes * pricePerWaitMin;
+
+  // 3. Subtotal diurno
+  const subtotal = baseFare + extraDistFare + extraWaitFare;
+
+  // 4. Recargo nocturno (si aplica)
+  let nightFare = 0;
+  if (isNight) {
+    nightFare = subtotal * (state.nightSurchargePct / 100);
+  }
+
+  const total = subtotal + nightFare;
+
+  return {
+    baseFare,
+    baseKm,
+    extraKm,
+    pricePerKm,
+    extraDistFare,
+    waitMinutes,
+    pricePerWaitMin,
+    extraWaitFare,
+    isNight,
+    nightFare,
+    subtotal,
+    total: Math.max(baseFare, total) // Garantiza nunca cobrar menos del banderazo base
+  };
+}
 ```
+
+---
+
+### 🔍 Explicación Paso a Paso del Algoritmo
+
+| Parámetro | Tipo | Descripción |
+| :--- | :--- | :--- |
+| `distanceKm` | `Number` | Distancia total recorrida acumulada (en kilómetros), calculada por GPS mediante la fórmula esférica de Haversine con filtro anti-ruido ($\ge 8\text{ m}$). |
+| `waitSeconds` | `Number` | Segundos acumulados con el vehículo detenido o en avance lento ($< 3.5\text{ km/h}$) en semáforos, intersecciones y embotellamientos. |
+| `tariff` | `Object` | Configuración de precios activa (ej. Banderazo inicial, distancia base incluida, costo por km extra y costo por minuto de espera). |
+| `isNight` | `Boolean` | Indicador de tarifa nocturna (activa automáticamente o manual entre las 22:00 y las 05:00 hrs). |
+
+#### 1. Distancia Extra sobre el Banderazo
+$$\text{extraKm} = \max(0, \text{distanceKm} - \text{baseKm})$$
+- Si el viaje dura **menos de 4.0 km**, la distancia extra es $0.00\text{ km}$ y no se cobra ningún peso adicional sobre el banderazo.
+- Si el viaje mide **6.50 km**, los primeros 4.0 km quedan cubiertos y solo se cobran $2.50\text{ km} \times \$4.50 = \$11.25$.
+
+#### 2. Tiempo de Espera en Tráfico y Semáforos
+$$\text{waitMinutes} = \lfloor \text{waitSeconds} / 60 \rfloor$$
+- Solo se cobran **minutos enteros completados** a razón de $\$1.00\text{ MXN/min}$. Los segundos fraccionarios no se cobran hasta completar el minuto siguiente.
+
+#### 3. Subtotal Base
+$$\text{Subtotal} = \text{Banderazo Base} + (\text{extraKm} \times \text{Precio por Km}) + (\text{waitMinutes} \times \text{Precio por Min})$$
+
+#### 4. Recargo Nocturno (Opcional)
+- Si la tarifa nocturna está activa, se suma un **20%** sobre el subtotal acumulado.
+
+#### 5. Total Final Auditado
+- Se aplica `Math.max(baseFare, total)` para asegurar que bajo ninguna circunstancia matemática el cobro sea inferior al banderazo regulado de arranque.
 
 ---
 
@@ -60,3 +124,4 @@ Total Final = Subtotal × (1 + Recargo Nocturno Si Aplica)
 ## 🤝 Contribuciones Comunitarias
 
 Este es un proyecto libre bajo licencia MIT. Las propuestas de actualización de tarifas oficiales publicadas por el Periódico Oficial del Estado de Hidalgo (POEH) o acuerdos gremiales son bienvenidas mediante *Pull Requests* o *Issues*.
+
