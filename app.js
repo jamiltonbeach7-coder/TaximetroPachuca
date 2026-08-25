@@ -497,9 +497,20 @@ function updateGpsIndicator(status, text) {
 let mapInstance = null;
 let mapTaxiMarker = null;
 let mapRoutePolyline = null;
+let mapPlannedPolyline = null;
+let mapStartMarker = null;
+let mapDestMarker = null;
 
 function initMapIfNeeded() {
-  if (mapInstance) return;
+  const mapElement = document.getElementById('map');
+  if (!mapElement) return;
+
+  if (mapInstance) {
+    setTimeout(() => {
+      if (mapInstance) mapInstance.invalidateSize(true);
+    }, 50);
+    return;
+  }
   
   // Coordenadas centrales de Pachuca (Reloj Monumental)
   const pachucaCenter = [20.1287, -98.7303];
@@ -508,7 +519,8 @@ function initMapIfNeeded() {
     if (typeof L === 'undefined') return;
 
     mapInstance = L.map('map', {
-      zoomControl: false
+      zoomControl: false,
+      preferCanvas: true
     }).setView(pachucaCenter, 14);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -519,25 +531,44 @@ function initMapIfNeeded() {
     L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
 
     const taxiIcon = L.divIcon({
-      className: 'custom-taxi-icon',
-      html: '<div style="font-size: 26px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); transition: all 0.3s ease;">🚕</div>',
-      iconSize: [30, 30],
-      iconAnchor: [15, 15]
+      className: 'custom-taxi-marker',
+      html: '<div class="taxi-marker-pin"><div class="taxi-marker-pulse"></div><span>🚕</span></div>',
+      iconSize: [42, 42],
+      iconAnchor: [21, 21]
     });
 
-    mapTaxiMarker = L.marker(pachucaCenter, { icon: taxiIcon }).addTo(mapInstance);
-    mapRoutePolyline = L.polyline([], { color: '#f59e0b', weight: 5, opacity: 0.85, smoothFactor: 1 }).addTo(mapInstance);
+    mapPlannedPolyline = L.polyline([], {
+      color: '#38bdf8',
+      weight: 4,
+      opacity: 0.5,
+      dashArray: '6, 8'
+    }).addTo(mapInstance);
+
+    mapRoutePolyline = L.polyline([], {
+      color: '#f59e0b',
+      weight: 6,
+      opacity: 0.95,
+      smoothFactor: 1
+    }).addTo(mapInstance);
+
+    mapTaxiMarker = L.marker(pachucaCenter, { icon: taxiIcon, zIndexOffset: 1000 }).addTo(mapInstance);
+
+    setTimeout(() => {
+      if (mapInstance) mapInstance.invalidateSize(true);
+    }, 100);
   } catch (e) {
     console.warn("Leaflet map load error:", e);
   }
 }
 
-function updateMapPosition(lat, lon) {
+function updateMapPosition(lat, lon, follow = true) {
   if (!mapInstance) return;
   if (mapTaxiMarker) {
     mapTaxiMarker.setLatLng([lat, lon]);
   }
-  mapInstance.panTo([lat, lon], { animate: true, duration: 0.4 });
+  if (follow) {
+    mapInstance.panTo([lat, lon], { animate: true, duration: 0.25, easeLinearity: 0.5 });
+  }
 }
 
 // ==========================================
@@ -979,8 +1010,15 @@ async function fetchOsrmRouteGeometry(routeKey) {
 
 async function startSimulationRide() {
   resetRide();
-  initMapIfNeeded();
+  
+  // 1. Mostrar contenedor del mapa primero para que tenga dimensiones válidas
   DOM.mapSection.classList.remove('hidden');
+  initMapIfNeeded();
+  
+  // Forzar recálculo de dimensiones de Leaflet para evitar que el marcador se quede en la esquina (0,0)
+  if (mapInstance) {
+    mapInstance.invalidateSize(true);
+  }
   
   const selectedRouteKey = DOM.selectSimRoute.value || 'centro_galerias';
   const speedMult = parseInt(DOM.selectSimSpeed.value, 10) || 3;
@@ -991,8 +1029,11 @@ async function startSimulationRide() {
 
   DOM.btnStopSimulation.classList.remove('hidden');
   DOM.simStatusBanner.classList.remove('hidden');
-  DOM.simStreetName.textContent = "Preparando ruta vial...";
-  DOM.simTrafficText.textContent = "Calculando trazado sobre calles...";
+  DOM.simStreetName.textContent = "Cargando ruta vial...";
+  DOM.simTrafficText.textContent = "Trazando calles de Pachuca...";
+
+  // Desplazar suavemente la vista hacia el mapa
+  DOM.mapSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
   const trajectory = await fetchOsrmRouteGeometry(selectedRouteKey);
   
@@ -1001,13 +1042,24 @@ async function startSimulationRide() {
     return;
   }
 
+  // 2. Trazar la ruta planificada completa en el mapa y ajustar el zoom
+  const fullCoords = trajectory.map(p => [p.lat, p.lon]);
+  if (mapPlannedPolyline) {
+    mapPlannedPolyline.setLatLngs(fullCoords);
+  }
+  if (mapRoutePolyline) {
+    mapRoutePolyline.setLatLngs([fullCoords[0]]);
+  }
+  if (mapInstance && fullCoords.length > 0) {
+    mapInstance.invalidateSize(true);
+    mapInstance.setView(fullCoords[0], 15);
+    updateMapPosition(fullCoords[0][0], fullCoords[0][1], true);
+  }
+
   let index = 0;
   let currentSpeed = 0;
   let waitingCounter = 0; // Segundos restantes de semáforo rojo
   let activeTrafficLight = null;
-
-  // Centrar mapa en origen
-  updateMapPosition(trajectory[0].lat, trajectory[0].lon);
 
   // Intervalo de simulación (cada 200ms)
   const stepMs = 200;

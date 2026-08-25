@@ -95,6 +95,53 @@ button:active {
   transform: scale(0.98);
 }
 
+/* Marcador personalizado del Taxi y animaciones en el mapa Leaflet */
+.leaflet-container {
+  font-family: inherit;
+  background-color: #020617 !important;
+}
+
+.custom-taxi-marker {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  border: none !important;
+}
+
+.taxi-marker-pin {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
+  z-index: 1000;
+}
+
+.taxi-marker-pulse {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.5);
+  animation: taxi-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  z-index: -1;
+}
+
+@keyframes taxi-ping {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  70%, 100% {
+    transform: scale(2.3);
+    opacity: 0;
+  }
+}
+
 /* Estilos de Impresión del Ticket */
 @media print {
   body * {
