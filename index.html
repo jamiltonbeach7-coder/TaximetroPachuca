@@ -306,7 +306,7 @@
     </section>
 
     <!-- MODO SIMULADOR DE PRUEBA REALISTA (CALLE POR CALLE CON SEMÁFOROS) -->
-    <section class="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg space-y-3">
+    <section class="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg space-y-3.5">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-lg">
@@ -314,30 +314,93 @@
           </div>
           <div>
             <h3 class="text-sm font-black text-slate-100 flex items-center gap-1.5">
-              Simulador de Rutas Reales y Tráfico
-              <span class="text-[10px] bg-sky-500/20 text-sky-400 border border-sky-500/30 px-1.5 py-0.5 rounded font-mono font-bold">Vialidad Real</span>
+              Simulador de Rutas Personalizadas y Tráfico
+              <span class="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-mono font-bold">Ruta Libre</span>
             </h3>
             <p class="text-[11px] text-slate-400">
-              Sigue el asfalto real de Pachuca respetando semáforos y midiendo el tiempo de espera.
+              Escribe tus direcciones o toca en el mapa para simular cualquier trayecto en Pachuca.
             </p>
           </div>
         </div>
       </div>
 
-      <!-- Selector de Rutas Reales -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <div class="sm:col-span-2">
-          <label class="block text-[11px] font-bold text-slate-400 mb-1">Ruta en Pachuca a simular:</label>
-          <select id="selectSimRoute" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-amber-500">
-            <option value="centro_galerias">1. Reloj Centro ➔ Galerías Pachuca (Blvd. Fpe. Ángeles, ~6.4 km)</option>
-            <option value="central_reloj">2. Central Autobuses ➔ Reloj (Viaducto Nvo. Hidalgo, ~4.1 km)</option>
-            <option value="explanada_hospital">3. Plaza Explanada ➔ Hospital General (Colosio, ~8.7 km)</option>
-            <option value="reloj_realmonte">4. Centro Pachuca ➔ Real del Monte (Panorámica, ~13.5 km)</option>
-          </select>
+      <!-- Entradas de Dirección: Origen y Destino -->
+      <div class="bg-slate-950/80 p-3 rounded-2xl border border-slate-800 space-y-2.5">
+        <!-- Origen -->
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 mb-1 flex items-center justify-between">
+            <span class="flex items-center gap-1 text-emerald-400">
+              <span>📍</span> <span>Dirección o Lugar de Origen:</span>
+            </span>
+            <span class="text-[10px] text-slate-500 font-normal">(Vacío = Reloj Monumental)</span>
+          </label>
+          <div class="flex gap-1.5">
+            <input type="text" id="inputSimOrigin" placeholder="Ej. Reloj Monumental, Plaza Juárez, Mi Ubicación..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-emerald-500 transition">
+            <button id="btnSetOriginFromGps" class="p-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-xl text-xs font-bold border border-slate-700" title="Usar mi ubicación GPS actual">
+              📍 GPS
+            </button>
+          </div>
         </div>
 
+        <!-- Botón Intercambiar -->
+        <div class="flex items-center justify-between px-1">
+          <div class="h-px bg-slate-800 flex-1"></div>
+          <button id="btnSwapAddresses" class="mx-2 p-1 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Intercambiar Origen y Destino">
+            ⇅ Intercambiar
+          </button>
+          <button id="btnPickOnMap" class="p-1 px-2 text-[11px] rounded-lg bg-sky-950 hover:bg-sky-900 text-sky-300 border border-sky-700 transition font-bold" title="Tocar en el mapa para fijar puntos">
+            🗺️ Tocar en Mapa
+          </button>
+          <div class="h-px bg-slate-800 flex-1"></div>
+        </div>
+
+        <!-- Destino -->
         <div>
-          <label class="block text-[11px] font-bold text-slate-400 mb-1">Velocidad simulación:</label>
+          <label class="block text-[11px] font-bold text-slate-400 mb-1 flex items-center justify-between">
+            <span class="flex items-center gap-1 text-amber-400">
+              <span>🏁</span> <span>Dirección o Lugar de Destino:</span>
+            </span>
+            <span class="text-[10px] text-slate-500 font-normal">(Vacío = Plaza Galerías)</span>
+          </label>
+          <input type="text" id="inputSimDest" placeholder="Ej. Plaza Galerías, UAEH, Hospital General, Real del Monte..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-amber-500 transition">
+        </div>
+
+        <!-- Chips Rápidos de Lugares Frecuentes -->
+        <div>
+          <div class="text-[10px] font-semibold text-slate-400 mb-1.5">Lugares frecuentes (un toque):</div>
+          <div class="flex flex-wrap gap-1.5 text-[10px]">
+            <button type="button" class="chip-place px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-500/20 hover:text-amber-300 border border-slate-700 text-slate-300 font-medium transition" data-name="Reloj Monumental de Pachuca" data-lat="20.12873" data-lon="-98.73032">
+              🏛️ Reloj Centro
+            </button>
+            <button type="button" class="chip-place px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-500/20 hover:text-amber-300 border border-slate-700 text-slate-300 font-medium transition" data-name="Plaza Galerías Pachuca" data-lat="20.08950" data-lon="-98.76610">
+              🛍️ Galerías
+            </button>
+            <button type="button" class="chip-place px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-500/20 hover:text-amber-300 border border-slate-700 text-slate-300 font-medium transition" data-name="Central de Autobuses de Pachuca" data-lat="20.10080" data-lon="-98.75380">
+              🚌 Central Autobuses
+            </button>
+            <button type="button" class="chip-place px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-500/20 hover:text-amber-300 border border-slate-700 text-slate-300 font-medium transition" data-name="Hospital General de Pachuca" data-lat="20.11200" data-lon="-98.72100">
+              🏥 Hospital General
+            </button>
+            <button type="button" class="chip-place px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-500/20 hover:text-amber-300 border border-slate-700 text-slate-300 font-medium transition" data-name="Estadio Hidalgo" data-lat="20.10580" data-lon="-98.74890">
+              ⚽ Estadio Hidalgo
+            </button>
+            <button type="button" class="chip-place px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-500/20 hover:text-amber-300 border border-slate-700 text-slate-300 font-medium transition" data-name="UAEH Ciudad del Conocimiento" data-lat="20.09300" data-lon="-98.71200">
+              🎓 UAEH
+            </button>
+            <button type="button" class="chip-place px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-500/20 hover:text-amber-300 border border-slate-700 text-slate-300 font-medium transition" data-name="Plaza Explanada Pachuca" data-lat="20.04500" data-lon="-98.78800">
+              🛒 Plaza Explanada
+            </button>
+            <button type="button" class="chip-place px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-500/20 hover:text-amber-300 border border-slate-700 text-slate-300 font-medium transition" data-name="Real del Monte Centro" data-lat="20.14150" data-lon="-98.67300">
+              🌲 Real del Monte
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ajuste de Velocidad y Modo -->
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex-1">
+          <label class="block text-[11px] font-bold text-slate-400 mb-1">Velocidad del viaje simulado:</label>
           <select id="selectSimSpeed" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-amber-500">
             <option value="3">⚡ Rápido (3x Demo)</option>
             <option value="1">⏱️ Tiempo Real (1x)</option>
@@ -362,10 +425,10 @@
 
       <!-- Botón Iniciar Simulación -->
       <div class="flex gap-2">
-        <button id="btnStartSimulation" class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black shadow transition flex items-center justify-center gap-2">
+        <button id="btnStartSimulation" class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black shadow-lg transition flex items-center justify-center gap-2">
           <span>🚀 Iniciar Viaje Simulado</span>
         </button>
-        <button id="btnStopSimulation" class="hidden py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-400 text-xs font-bold border border-slate-700 transition">
+        <button id="btnStopSimulation" class="hidden py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-400 text-xs font-bold border border-slate-700 transition">
           Detener Demo
         </button>
       </div>
