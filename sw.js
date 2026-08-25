@@ -1,5 +1,5 @@
-// Service Worker para Taxímetro Pachuca
-const CACHE_NAME = 'taximetro-pachuca-v1';
+// Service Worker para Taxímetro Pachuca (Versión 3 - Auto-Update)
+const CACHE_NAME = 'taximetro-pachuca-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -10,10 +10,11 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -23,6 +24,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
+            console.log('Limpiando caché antigua:', key);
             return caches.delete(key);
           }
         })
@@ -32,32 +34,45 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Estrategia Cache First con Network Fallback
+  const url = event.request.url;
+
+  // Para archivos locales de la app (HTML, JS, CSS): Network First para tener siempre la última versión
+  if (url.includes('index.html') || url.includes('app.js') || url.includes('style.css') || event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request).then(cached => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // Para tiles de mapas y recursos externos: Stale-While-Revalidate o Cache First
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
       return fetch(event.request).then((networkResponse) => {
-        // Cachear recursos externos válidos (ej. Leaflet CDN o tiles si están disponibles)
         if (
           networkResponse &&
           networkResponse.status === 200 &&
-          (event.request.url.startsWith('https://unpkg.com') ||
-           event.request.url.startsWith('https://cdnjs.cloudflare.com'))
+          (url.startsWith('https://unpkg.com') ||
+           url.startsWith('https://cdn.jsdelivr.net') ||
+           url.startsWith('https://cdn.tailwindcss.com') ||
+           url.includes('cartocdn.com') ||
+           url.includes('openstreetmap.org'))
         ) {
           const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
         }
         return networkResponse;
-      }).catch(() => {
-        // Si no hay red y se pide navegación HTML, devolver index.html del cache
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
-      });
+      }).catch(() => null);
     })
   );
 });

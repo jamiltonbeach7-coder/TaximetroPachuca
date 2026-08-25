@@ -1310,13 +1310,41 @@ DOM.btnCloseInstallBanner.addEventListener('click', () => {
   DOM.installBanner.classList.add('hidden');
 });
 
-// Registrar Service Worker
+// Registrar y Actualizar Service Worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch((err) => {
+    navigator.serviceWorker.register('./sw.js?v=3').then((reg) => {
+      reg.update();
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (newWorker) {
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              const toast = document.getElementById('updateToast');
+              if (toast) toast.classList.remove('hidden');
+            }
+          });
+        }
+      });
+    }).catch((err) => {
       console.warn("Service Worker registration failed:", err);
     });
   });
+
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true;
+      window.location.reload();
+    }
+  });
+
+  const updateToast = document.getElementById('updateToast');
+  if (updateToast) {
+    updateToast.addEventListener('click', () => {
+      window.location.reload(true);
+    });
+  }
 }
 
 // ==========================================

@@ -95,7 +95,31 @@ button:active {
   transform: scale(0.98);
 }
 
-/* Marcador personalizado del Taxi y animaciones en el mapa Leaflet */
+/* =========================================================
+   CORRECCIÓN CRÍTICA: Conflicto de Tailwind CSS con Leaflet
+   Tailwind aplica 'img { max-width: 100% }' que rompe los tiles
+   ========================================================= */
+.leaflet-container img,
+.leaflet-tile-container img,
+.leaflet-tile-pane img,
+.leaflet-pane img,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+  max-width: none !important;
+  max-height: none !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline !important;
+  box-shadow: none !important;
+}
+
+.leaflet-tile {
+  visibility: inherit !important;
+  width: 256px !important;
+  height: 256px !important;
+}
+
 #map {
   width: 100% !important;
   height: 320px !important;
@@ -118,14 +142,6 @@ button:active {
   background-color: #0f172a !important;
   width: 100% !important;
   height: 100% !important;
-}
-
-.leaflet-tile-pane {
-  filter: brightness(0.95);
-}
-
-html.dark .leaflet-tile-pane {
-  filter: brightness(0.85) contrast(1.1);
 }
 
 .custom-taxi-marker {
