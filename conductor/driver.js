@@ -79,8 +79,13 @@ function createSync() {
     onState: (st) => {
       const labels = { idle: 'Sin vincular', pairing: 'Emparejando…', connected: '✅ Conectado', disconnected: '⚠️ Desconectado', timeout: '⏱️ Sin conexión', error: '⚠️ Mensaje rechazado' };
       $('connBadge').textContent = labels[st] || st;
-      if (st === 'connected') $('pairStatus').textContent = 'Conectado. Esperando datos del viaje…';
+      if (st === 'connected') {
+        $('pairStatus').textContent = 'Conectado. Esperando datos del viaje…';
+        $('pairSection').classList.add('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
       if (st === 'timeout') $('pairStatus').textContent = 'No se logró conectar (¿redes distintas?). Prueba la misma Wi-Fi o usa el Plan B de abajo.';
+      if (st === 'disconnected') $('pairSection').classList.remove('hidden');
       if (st === 'disconnected') $('pairStatus').textContent = 'Conexión perdida. Pide al pasajero una nueva invitación.';
     },
     onVerifyCode: (code) => { $('verifyCode').textContent = code; $('verifyBox').classList.remove('hidden'); },
@@ -140,6 +145,32 @@ $('btnScanSnap').addEventListener('click', async () => {
   await TP.qr.scan($('snapVideo'), (text) => {
     $('snapVideo').classList.add('hidden'); $('snapCode').value = text; loadSnapshot(text);
   }, () => { $('snapVideo').classList.add('hidden'); $('snapStatus').textContent = 'No se pudo abrir la cámara; pega el código.'; });
+});
+
+// Flujo inverso: el conductor genera la invitación y el pasajero la escanea
+$('btnGenInvite').addEventListener('click', async () => {
+  try {
+    if (!window.RTCPeerConnection) throw new Error('Este navegador no soporta WebRTC');
+    $('pairStatus').textContent = 'Generando invitación…';
+    if (!sync) createSync();
+    const code = await sync.createOffer();
+    $('inviteCode').value = code;
+    $('inviteBox').classList.remove('hidden');
+    try { await TP.qr.render($('inviteQr'), code); } catch (e) { $('inviteQr').classList.add('hidden'); }
+    $('pairStatus').textContent = 'Muestra este QR al pasajero.';
+  } catch (e) { $('pairStatus').textContent = 'Error: ' + e.message; }
+});
+$('btnCopyInvite').addEventListener('click', () => { navigator.clipboard && navigator.clipboard.writeText($('inviteCode').value); });
+async function applyAnswer(code) {
+  try { await sync.acceptAnswer(code); $('pairStatus').textContent = 'Conectando…'; }
+  catch (e) { $('pairStatus').textContent = 'Código inválido: ' + e.message; }
+}
+$('btnApplyAns').addEventListener('click', () => applyAnswer($('ansIn').value));
+$('btnScanAnswer').addEventListener('click', async () => {
+  $('scanAnsVideo').classList.remove('hidden');
+  await TP.qr.scan($('scanAnsVideo'), (text) => {
+    $('scanAnsVideo').classList.add('hidden'); applyAnswer(text);
+  }, () => { $('scanAnsVideo').classList.add('hidden'); $('pairStatus').textContent = 'No se pudo abrir la cámara; pega el código.'; });
 });
 
 runIntegrityCheck();

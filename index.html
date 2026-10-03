@@ -235,6 +235,12 @@
       </div>
     </div>
 
+    <!-- Estado de sincronización con el conductor (obligatoria para iniciar) -->
+    <div id="syncBanner" class="rounded-2xl border px-4 py-3 flex items-center justify-between gap-3 bg-red-900/30 border-red-500/60 text-red-200">
+      <span id="syncBannerText" class="text-sm font-semibold">⚠️ Sin sincronizar con el conductor. Vincula para poder iniciar el viaje.</span>
+      <button id="btnSyncBanner" class="shrink-0 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold px-3 py-1.5 rounded-lg">🔗 Vincular</button>
+    </div>
+
     <!-- BOTONES DE ACCIÓN PRINCIPALES (GIGANTES Y SIN CONFUSIÓN) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="controlButtonsContainer">
       <!-- Botón Iniciar Viaje -->
@@ -523,6 +529,20 @@
         <button id="btnScanAnswer" class="w-full bg-slate-800 border border-slate-700 text-slate-100 font-semibold py-2 rounded-xl">📷 Escanear respuesta</button>
         <textarea id="answerCode" rows="3" placeholder="…o pega aquí el código de respuesta (TP1.…)" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[10px] font-mono text-slate-200"></textarea>
         <button id="btnApplyAnswer" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2 rounded-xl">Conectar</button>
+      </div>
+
+      <div class="border-t border-slate-700 pt-3 space-y-2">
+        <h4 class="text-sm font-bold text-amber-400">…o escanea la invitación del conductor</h4>
+        <video id="scanOfferVideo" class="hidden w-full rounded-xl bg-black" playsinline muted></video>
+        <button id="btnScanOffer" class="w-full bg-slate-800 border border-slate-700 text-slate-100 font-semibold py-2 rounded-xl">📷 Escanear invitación del conductor</button>
+        <textarea id="offerCode" rows="2" placeholder="…o pega aquí su invitación (TP1.…)" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[10px] font-mono text-slate-200"></textarea>
+        <button id="btnAcceptOffer" class="w-full bg-slate-800 border border-slate-700 text-slate-100 font-semibold py-2 rounded-xl">Generar respuesta</button>
+        <div id="answerBox" class="hidden space-y-2">
+          <p class="text-xs text-slate-400">Muestra este QR al conductor para que lo escanee y conectar.</p>
+          <div id="answerQr" class="bg-white rounded-xl p-2"></div>
+          <textarea id="answerOut" readonly rows="3" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[10px] font-mono text-slate-300"></textarea>
+          <button id="btnCopyAnswerOut" class="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold py-1.5 rounded-lg">📋 Copiar código</button>
+        </div>
       </div>
 
       <div id="linkVerify" class="hidden bg-slate-800 border border-slate-700 rounded-xl p-3 text-center">

@@ -45,6 +45,21 @@
         <button id="btnCopyAnswer" class="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold py-1.5 rounded-lg">📋 Copiar código</button>
       </div>
 
+      <div class="border-t border-slate-700 pt-3 space-y-2">
+        <h3 class="text-sm font-bold text-amber-400">…o genera tú la invitación para que el pasajero la escanee</h3>
+        <button id="btnGenInvite" class="w-full bg-slate-800 border border-slate-700 text-slate-100 font-semibold py-2 rounded-xl">Generar invitación (QR)</button>
+        <div id="inviteBox" class="hidden space-y-2">
+          <div id="inviteQr" class="bg-white rounded-xl p-2"></div>
+          <textarea id="inviteCode" readonly rows="3" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[10px] font-mono text-slate-300"></textarea>
+          <button id="btnCopyInvite" class="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold py-1.5 rounded-lg">📋 Copiar código</button>
+          <p class="text-xs text-slate-400">Cuando el pasajero te muestre su QR de respuesta, escanéalo o pégalo:</p>
+          <video id="scanAnsVideo" class="hidden w-full rounded-xl bg-black" playsinline muted></video>
+          <button id="btnScanAnswer" class="w-full bg-slate-800 border border-slate-700 text-slate-100 font-semibold py-2 rounded-xl">📷 Escanear respuesta del pasajero</button>
+          <textarea id="ansIn" rows="2" placeholder="…o pega la respuesta (TP1.…)" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[10px] font-mono text-slate-200"></textarea>
+          <button id="btnApplyAns" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2 rounded-xl">Conectar</button>
+        </div>
+      </div>
+
       <div id="verifyBox" class="hidden bg-slate-800 border border-slate-700 rounded-xl p-3 text-center">
         <p class="text-xs text-slate-400">Código de verificación (debe ser igual en ambos teléfonos)</p>
         <p id="verifyCode" class="text-3xl font-black font-digital text-emerald-400 tracking-widest"></p>

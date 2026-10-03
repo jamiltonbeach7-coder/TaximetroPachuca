@@ -721,6 +721,7 @@ async function fetchOsrmRouteBetweenPoints(origCoords, destCoords) {
 // ==========================================
 
 async function startSimulationRide() {
+  if (!requireSync()) return;
   resetRide();
   
   // 1. Mostrar contenedor del mapa primero para que tenga dimensiones válidas
@@ -947,6 +948,7 @@ function handleMapPickClick(lat, lon) {
 // ==========================================
 
 function startRide() {
+  if (!requireSync()) return;
   sounds.startRideSound();
   requestWakeLock();
 
@@ -1513,6 +1515,31 @@ function broadcastTick(total, force) {
   });
 }
 
+function isSynced() {
+  return !!(syncLink && syncLink.connected && !syncLink.blocked);
+}
+
+function refreshSyncUI() {
+  const banner = document.getElementById('syncBanner');
+  const text = document.getElementById('syncBannerText');
+  const btn = document.getElementById('btnSyncBanner');
+  if (!banner) return;
+  const synced = isSynced();
+  banner.className = 'rounded-2xl border px-4 py-3 flex items-center justify-between gap-3 ' +
+    (synced ? 'bg-emerald-900/30 border-emerald-500/60 text-emerald-200' : 'bg-red-900/30 border-red-500/60 text-red-200');
+  text.textContent = synced ? '✅ Sincronizado con el conductor. Ya puedes iniciar el viaje.' : '⚠️ Sin sincronizar con el conductor. Vincula para poder iniciar el viaje.';
+  btn.classList.toggle('hidden', synced);
+  if (DOM.btnStartRide) DOM.btnStartRide.classList.toggle('opacity-50', !synced);
+}
+
+// Devuelve true si se puede iniciar; si no, abre la ventana de vinculación
+function requireSync() {
+  if (isSynced()) return true;
+  LINK.modal.classList.remove('hidden');
+  setLinkStatus('Primero sincroniza con el conductor para iniciar el viaje.');
+  return false;
+}
+
 function setLinkStatus(text) { if (LINK.status) LINK.status.textContent = text; }
 
 async function runIntegrityCheck() {
@@ -1540,10 +1567,19 @@ function createSyncLink() {
       const labels = { idle: 'Sin vincular.', pairing: 'Emparejando…', connected: '✅ Conectado con el conductor', disconnected: '⚠️ Conexión perdida. Vuelve a vincular.', timeout: '⏱️ No se logró conectar (¿redes distintas?). Usa la misma Wi-Fi o el Plan B sin conexión.', error: '⚠️ Mensaje rechazado (firma inválida).' };
       setLinkStatus(labels[st] || st);
       LINK.btnDisconnect.classList.toggle('hidden', st === 'idle');
-      if (st === 'connected') { LINK.step2.classList.add('hidden'); broadcastTick(null, true); }
+      if (st === 'connected') {
+        LINK.step2.classList.add('hidden');
+        broadcastTick(null, true);
+        // Tras el 'hello' (verificación de versión) vuelve a la pantalla principal si todo coincide
+        setTimeout(() => {
+          refreshSyncUI();
+          if (isSynced()) { LINK.modal.classList.add('hidden'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+        }, 1200);
+      }
+      refreshSyncUI();
     },
     onVerifyCode: (code) => { LINK.verifyCode.textContent = code; LINK.verifyBox.classList.remove('hidden'); },
-    onHello: (info) => { LINK.mismatch.classList.toggle('hidden', !info.mismatch); },
+    onHello: (info) => { LINK.mismatch.classList.toggle('hidden', !info.mismatch); refreshSyncUI(); },
     onMessage: () => { /* El pasajero solo emite; el conductor puede enviar 'ack' en el futuro */ }
   });
 }
@@ -1609,13 +1645,45 @@ function initLinkListeners() {
     if (syncLink) syncLink.unblock();
     LINK.mismatch.classList.add('hidden');
     broadcastTick(null, true);
+    refreshSyncUI();
+    LINK.modal.classList.add('hidden');
   });
   LINK.btnDisconnect.addEventListener('click', () => {
     if (syncLink) syncLink.close();
     LINK.verifyBox.classList.add('hidden');
     LINK.mismatch.classList.add('hidden');
     LINK.step2.classList.add('hidden');
+    refreshSyncUI();
   });
+
+  document.getElementById('btnSyncBanner').addEventListener('click', () => LINK.modal.classList.remove('hidden'));
+
+  // Flujo inverso: el conductor genera la invitación y el pasajero la escanea
+  async function acceptDriverOffer(code) {
+    try {
+      if (!window.RTCPeerConnection) throw new Error('Este navegador no soporta WebRTC');
+      setLinkStatus('Generando respuesta…');
+      if (!syncLink) createSyncLink();
+      const answer = await syncLink.acceptOffer(code);
+      document.getElementById('answerOut').value = answer;
+      document.getElementById('answerBox').classList.remove('hidden');
+      try { await window.TP.qr.render(document.getElementById('answerQr'), answer); }
+      catch (e) { document.getElementById('answerQr').classList.add('hidden'); }
+      setLinkStatus('Muestra el QR de respuesta al conductor.');
+    } catch (e) { setLinkStatus('Invitación inválida: ' + e.message); }
+  }
+  document.getElementById('btnAcceptOffer').addEventListener('click', () => acceptDriverOffer(document.getElementById('offerCode').value));
+  document.getElementById('btnScanOffer').addEventListener('click', async () => {
+    const v = document.getElementById('scanOfferVideo');
+    v.classList.remove('hidden');
+    stopScan = await window.TP.qr.scan(v, (text) => {
+      v.classList.add('hidden'); stopScan = null; document.getElementById('offerCode').value = text; acceptDriverOffer(text);
+    }, () => { v.classList.add('hidden'); setLinkStatus('No se pudo abrir la cámara; pega el código.'); });
+  });
+  document.getElementById('btnCopyAnswerOut').addEventListener('click', () => {
+    navigator.clipboard && navigator.clipboard.writeText(document.getElementById('answerOut').value);
+  });
+  refreshSyncUI();
 }
 
 // Inicialización cuando carga el documento
