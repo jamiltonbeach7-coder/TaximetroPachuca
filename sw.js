@@ -1,12 +1,20 @@
-// Service Worker para Taxímetro Pachuca (Versión 7 - Auto-Update & Performance)
-const CACHE_NAME = 'taximetro-pachuca-v7';
+// Service Worker para Taxímetro Pachuca (Versión 8 - Conductor, sync P2P e integridad)
+const CACHE_NAME = 'taximetro-pachuca-v8';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './style.css',
   './app.js',
   './manifest.json',
-  './icon.svg'
+  './icon.svg',
+  './integrity.json',
+  './shared/fare.js',
+  './shared/integrity.js',
+  './shared/sync.js',
+  './conductor/',
+  './conductor/index.html',
+  './conductor/driver.js',
+  './conductor/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
@@ -37,7 +45,7 @@ self.addEventListener('fetch', (event) => {
   const url = event.request.url;
 
   // Para archivos locales de la app (HTML, JS, CSS): Network First para tener siempre la última versión
-  if (url.includes('index.html') || url.includes('app.js') || url.includes('style.css') || event.request.mode === 'navigate') {
+  if (url.includes('index.html') || url.includes('app.js') || url.includes('style.css') || url.includes('/shared/') || url.includes('/conductor/') || url.includes('integrity.json') || url.includes('manifest.json') || event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {

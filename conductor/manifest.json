@@ -1,0 +1,14 @@
+{
+  "name": "Taxímetro Pachuca - Conductor",
+  "short_name": "Taxímetro Conductor",
+  "description": "Versión para el conductor: recibe en vivo el viaje del pasajero y verifica la tarifa.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "../icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

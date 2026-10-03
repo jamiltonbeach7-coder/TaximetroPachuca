@@ -34,7 +34,7 @@ En Pachuca, la ausencia de una regulación generalizada de taxímetros ha genera
 
 ## 🧮 Detalle del Código: ¿Dónde y cómo se calcula el costo?
 
-El cálculo del costo total se encuentra implementado en el archivo [`app.js`](app.js) dentro de la función **`calculateFare()`** (Líneas 307 a 346).
+El cálculo del costo total se encuentra implementado en el archivo [`app.js`](app.js) dentro de la función **`calculateFare()`**, ahora en [`shared/fare.js`](shared/fare.js) y compartida por la app del pasajero y la del conductor (`app.js` solo la envuelve pasando el recargo nocturno).
 
 ### 📄 Código Fuente de la Función
 
@@ -109,6 +109,16 @@ $$\text{Subtotal} = \text{Banderazo Base} + (\text{extraKm} \times \text{Precio 
 
 #### 5. Total Final Auditado
 - Se aplica `Math.max(baseFare, total)` para asegurar que bajo ninguna circunstancia matemática el cobro sea inferior al banderazo regulado de arranque.
+
+---
+
+## 🧑‍✈️ App del Conductor y Sincronización
+
+- **Conductor**: `/conductor/` (misma URL de GitHub Pages + `conductor/`). Recibe en vivo distancia, tiempo, espera y tarifa del pasajero, **recalcula** el total con el mismo motor y avisa si difiere más de $0.01.
+- **Sincronización P2P (WebRTC)**: sin servidor. En la app del pasajero toca 🔗 → genera el QR de invitación → el conductor lo escanea (o pega el código) → el pasajero escanea el QR de respuesta. Ambos ven un **código de 4 dígitos** que debe coincidir. Cada mensaje lleva número de secuencia y **HMAC-SHA-256** derivado de los códigos intercambiados; los inválidos o repetidos se descartan. Usa STUN público de Google; en redes que bloquean P2P puede fallar.
+- **Verificación de integridad**: `integrity.json` guarda el SHA-256 de cada archivo y un hash raíz. Al abrir, cada app descarga sus archivos, los hashea y muestra ✅/⚠️ en la cabecera; al emparejarse intercambian el hash raíz y, si difiere, no se envían datos hasta confirmar.
+- **Tras editar cualquier archivo**: `node tools/build-manifest.mjs` y sube también `integrity.json`.
+- **Limitación**: una app que se verifica a sí misma no protege si el servidor sirve código malicioso desde el inicio. Compara el hash raíz publicado aquí con el que muestra la insignia (pasa el cursor sobre ella).
 
 ---
 

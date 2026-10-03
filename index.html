@@ -72,7 +72,7 @@
     }
   </style>
 
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-amber-500 selection:text-slate-900 transition-colors duration-200">
 
@@ -117,6 +117,14 @@
         <button id="btnGpsStatus" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-semibold hover:border-slate-600 transition" title="Estado de la señal GPS">
           <span id="gpsPulse" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
           <span id="gpsStatusText" class="text-slate-300">GPS...</span>
+        </button>
+
+        <!-- Integridad de la app (SHA-256) -->
+        <button id="integrityBadge" class="px-2 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300" title="Verificación de integridad de la app">🔍 ...</button>
+
+        <!-- Vincular con conductor -->
+        <button id="btnOpenLink" class="p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-amber-400 hover:border-amber-500/50 transition" title="Vincular con la app del conductor" aria-label="Vincular con conductor">
+          🔗
         </button>
 
         <!-- Botón Modo Claro / Oscuro -->
@@ -493,6 +501,44 @@
 
   <!-- ==================== MODALES ACCESIBLES ==================== -->
 
+    <!-- Modal: Vincular con el conductor -->
+  <div id="linkModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-black text-amber-400">🔗 Vincular con el conductor</h3>
+        <button id="btnCloseLinkModal" class="text-slate-400 hover:text-white text-xl font-bold">✕</button>
+      </div>
+      <p id="linkStatus" class="text-sm text-slate-300">Sin vincular.</p>
+
+      <div id="linkStep1" class="space-y-2">
+        <button id="btnGenerateInvite" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-xl">1. Generar invitación (QR)</button>
+        <div id="inviteQr" class="bg-white rounded-xl p-2 hidden"></div>
+        <textarea id="inviteCode" readonly rows="3" class="hidden w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[10px] font-mono text-slate-300"></textarea>
+        <button id="btnCopyInvite" class="hidden w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold py-1.5 rounded-lg">📋 Copiar código</button>
+      </div>
+
+      <div id="linkStep2" class="hidden space-y-2">
+        <p class="text-xs text-slate-400">2. Pide al conductor que escanee tu QR y luego escanea su respuesta (o pega su código).</p>
+        <video id="scanVideo" class="hidden w-full rounded-xl bg-black" playsinline muted></video>
+        <button id="btnScanAnswer" class="w-full bg-slate-800 border border-slate-700 text-slate-100 font-semibold py-2 rounded-xl">📷 Escanear respuesta</button>
+        <textarea id="answerCode" rows="3" placeholder="…o pega aquí el código de respuesta (TP1.…)" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[10px] font-mono text-slate-200"></textarea>
+        <button id="btnApplyAnswer" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2 rounded-xl">Conectar</button>
+      </div>
+
+      <div id="linkVerify" class="hidden bg-slate-800 border border-slate-700 rounded-xl p-3 text-center">
+        <p class="text-xs text-slate-400">Código de verificación (debe ser igual en ambos teléfonos)</p>
+        <p id="verifyCode" class="text-3xl font-black font-digital text-emerald-400 tracking-widest"></p>
+      </div>
+
+      <div id="linkMismatch" class="hidden bg-red-900/40 border border-red-500 rounded-xl p-3 text-sm text-red-200 space-y-2">
+        <p>⚠️ La app del conductor no coincide con la tuya (hash distinto o no verificado). Por seguridad no se envían datos del viaje.</p>
+        <button id="btnForceLink" class="bg-red-500 hover:bg-red-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Enviar de todos modos</button>
+      </div>
+      <button id="btnDisconnectLink" class="hidden w-full bg-slate-800 border border-red-500/50 text-red-300 text-sm font-semibold py-2 rounded-xl">Desvincular</button>
+    </div>
+  </div>
+
+
   <!-- 1. MODAL DE CAMBIO Y CONFIGURACIÓN DE TARIFAS -->
   <div id="tariffModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
@@ -808,6 +854,9 @@
     <span class="bg-slate-950 text-amber-400 px-2 py-0.5 rounded-lg text-[10px]">Actualizar ↻</span>
   </div>
 
-  <script src="app.js?v=7"></script>
+  <script src="shared/fare.js"></script>
+  <script src="shared/integrity.js"></script>
+  <script src="shared/sync.js"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

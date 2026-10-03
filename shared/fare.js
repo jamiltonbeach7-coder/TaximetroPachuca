@@ -1,0 +1,78 @@
+/**
+ * Taxímetro Pachuca - Motor de tarifas compartido (pasajero y conductor)
+ * Una sola fuente de verdad: ambas apps calculan el costo con esta misma función.
+ */
+(function (root) {
+  const TARIFF_PRESETS = {
+    pachuca_2026: {
+      name: "Propuesta Pachuca 2026 ($50.00 base)",
+      shortName: "Pachuca ($50 base / 4km + $4.50/km)",
+      baseFare: 50.00,
+      baseKm: 4.0,
+      pricePerKm: 4.50,
+      pricePerWaitMinute: 1.00
+    },
+    historica: {
+      name: "Referencia Histórica ($38.50 base)",
+      shortName: "Histórica ($38.50 base / 4km + $3.50/km)",
+      baseFare: 38.50,
+      baseKm: 4.0,
+      pricePerKm: 3.50,
+      pricePerWaitMinute: 1.00
+    },
+    custom: {
+      name: "Tarifa Personalizada",
+      shortName: "Personalizada",
+      baseFare: 50.00,
+      baseKm: 4.0,
+      pricePerKm: 4.50,
+      pricePerWaitMinute: 1.00
+    }
+  };
+
+  function calculateFare(distanceKm, waitSeconds, tariff, isNight, nightSurchargePct) {
+    const nightPct = nightSurchargePct === undefined ? 20 : nightSurchargePct;
+    const baseFare = Number(tariff.baseFare) || 50.00;
+    const baseKm = Number(tariff.baseKm) || 4.0;
+    const pricePerKm = Number(tariff.pricePerKm) || 4.50;
+    const pricePerWaitMin = Number(tariff.pricePerWaitMinute) || 1.00;
+
+    // Kilómetros adicionales que exceden el banderazo
+    const extraKm = Math.max(0, distanceKm - baseKm);
+    const extraDistFare = extraKm * pricePerKm;
+
+    // Minutos de espera en semáforos o tráfico detenido
+    const waitMinutes = Math.floor(waitSeconds / 60);
+    const extraWaitFare = waitMinutes * pricePerWaitMin;
+
+    // Subtotal diurno
+    const subtotal = baseFare + extraDistFare + extraWaitFare;
+
+    // Recargo nocturno (si aplica)
+    let nightFare = 0;
+    if (isNight) {
+      nightFare = subtotal * (nightPct / 100);
+    }
+
+    const total = subtotal + nightFare;
+
+    return {
+      baseFare,
+      baseKm,
+      extraKm,
+      pricePerKm,
+      extraDistFare,
+      waitMinutes,
+      pricePerWaitMin,
+      extraWaitFare,
+      isNight,
+      nightFare,
+      subtotal,
+      total: Math.max(baseFare, total)
+    };
+  }
+
+  const TP = root.TP = root.TP || {};
+  TP.TARIFF_PRESETS = TARIFF_PRESETS;
+  TP.calculateFare = calculateFare;
+})(window);

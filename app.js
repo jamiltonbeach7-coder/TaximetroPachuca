@@ -7,32 +7,8 @@
 // 1. CONFIGURACIÓN Y ESTADO DE LA APLICACIÓN
 // ==========================================
 
-const TARIFF_PRESETS = {
-  pachuca_2026: {
-    name: "Propuesta Pachuca 2026 ($50.00 base)",
-    shortName: "Pachuca ($50 base / 4km + $4.50/km)",
-    baseFare: 50.00,
-    baseKm: 4.0,
-    pricePerKm: 4.50,
-    pricePerWaitMinute: 1.00
-  },
-  historica: {
-    name: "Referencia Histórica ($38.50 base)",
-    shortName: "Histórica ($38.50 base / 4km + $3.50/km)",
-    baseFare: 38.50,
-    baseKm: 4.0,
-    pricePerKm: 3.50,
-    pricePerWaitMinute: 1.00
-  },
-  custom: {
-    name: "Tarifa Personalizada",
-    shortName: "Personalizada",
-    baseFare: 50.00,
-    baseKm: 4.0,
-    pricePerKm: 4.50,
-    pricePerWaitMinute: 1.00
-  }
-};
+// Tarifas y motor de cálculo compartidos con la app del conductor (shared/fare.js)
+const { TARIFF_PRESETS } = window.TP;
 
 const PACHUCA_KNOWN_PLACES = {
   "reloj": [20.12873, -98.73032],
@@ -304,45 +280,9 @@ const sounds = new SoundEffects();
 // 4. MOTOR DE CÁLCULO Y AUDITORÍA MATEMÁTICA
 // ==========================================
 
+// Delegado al motor compartido (shared/fare.js) para que pasajero y conductor calculen idéntico
 function calculateFare(distanceKm, waitSeconds, tariff, isNight) {
-  const baseFare = Number(tariff.baseFare) || 50.00;
-  const baseKm = Number(tariff.baseKm) || 4.0;
-  const pricePerKm = Number(tariff.pricePerKm) || 4.50;
-  const pricePerWaitMin = Number(tariff.pricePerWaitMinute) || 1.00;
-
-  // Kilómetros adicionales que exceden el banderazo
-  const extraKm = Math.max(0, distanceKm - baseKm);
-  const extraDistFare = extraKm * pricePerKm;
-
-  // Minutos de espera en semáforos o tráfico detenido
-  const waitMinutes = Math.floor(waitSeconds / 60);
-  const extraWaitFare = waitMinutes * pricePerWaitMin;
-
-  // Subtotal diurno
-  const subtotal = baseFare + extraDistFare + extraWaitFare;
-
-  // Recargo nocturno (si aplica)
-  let nightFare = 0;
-  if (isNight) {
-    nightFare = subtotal * (state.nightSurchargePct / 100);
-  }
-
-  const total = subtotal + nightFare;
-
-  return {
-    baseFare,
-    baseKm,
-    extraKm,
-    pricePerKm,
-    extraDistFare,
-    waitMinutes,
-    pricePerWaitMin,
-    extraWaitFare,
-    isNight,
-    nightFare,
-    subtotal,
-    total: Math.max(baseFare, total)
-  };
+  return window.TP.calculateFare(distanceKm, waitSeconds, tariff, isNight, state.nightSurchargePct);
 }
 
 function updateDisplays() {
@@ -387,6 +327,8 @@ function updateDisplays() {
   }
 
   DOM.auditTotalFare.textContent = calculation.total.toFixed(2);
+
+  broadcastTick(calculation.total);
 }
 
 function formatTime(totalSeconds) {
@@ -1074,6 +1016,7 @@ function finishRide() {
 
   setVisualStatus('finished', '🏁 Viaje terminado');
   updateDisplays();
+  broadcastTick(null, true);
 
   showTicketModal();
 }
@@ -1109,6 +1052,7 @@ function resetRide() {
 
   setVisualStatus('idle', 'Listo para iniciar');
   updateDisplays();
+  broadcastTick(null, true);
 }
 
 function setVisualStatus(type, label) {
@@ -1322,13 +1266,13 @@ if ('serviceWorker' in navigator) {
   if ('caches' in window) {
     caches.keys().then((keys) => {
       keys.forEach((key) => {
-        if (key !== 'taximetro-pachuca-v7') caches.delete(key);
+        if (key !== 'taximetro-pachuca-v8') caches.delete(key);
       });
     });
   }
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=7').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=8').then((reg) => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
@@ -1517,9 +1461,145 @@ function initEventListeners() {
   }
 }
 
+// ==========================================
+// 13. INTEGRIDAD Y VÍNCULO CON LA APP DEL CONDUCTOR
+// ==========================================
+
+const integrityState = { ok: false, rootHash: '', done: false };
+let syncLink = null;
+let lastTickSent = 0;
+const LINK = {
+  modal: document.getElementById('linkModal'),
+  status: document.getElementById('linkStatus'),
+  verifyBox: document.getElementById('linkVerify'),
+  verifyCode: document.getElementById('verifyCode'),
+  mismatch: document.getElementById('linkMismatch'),
+  step2: document.getElementById('linkStep2'),
+  inviteQr: document.getElementById('inviteQr'),
+  inviteCode: document.getElementById('inviteCode'),
+  btnCopy: document.getElementById('btnCopyInvite'),
+  video: document.getElementById('scanVideo'),
+  answer: document.getElementById('answerCode'),
+  btnDisconnect: document.getElementById('btnDisconnectLink'),
+  badge: document.getElementById('integrityBadge')
+};
+let stopScan = null;
+
+function broadcastTick(total, force) {
+  if (!syncLink || !syncLink.connected) return;
+  const now = Date.now();
+  if (!force && now - lastTickSent < 900) return;
+  lastTickSent = now;
+  syncLink.send('tick', {
+    status: state.status,
+    distanceKm: state.totalDistanceKm,
+    waitSeconds: state.totalWaitSeconds,
+    elapsedSeconds: state.totalElapsedSeconds,
+    speedKmh: state.currentSpeedKmh,
+    tariff: state.tariff,
+    tariffKey: state.tariffKey,
+    isNight: state.nightFareActive,
+    nightPct: state.nightSurchargePct,
+    total: total === null ? window.TP.calculateFare(state.totalDistanceKm, state.totalWaitSeconds, state.tariff, state.nightFareActive, state.nightSurchargePct).total : total
+  });
+}
+
+function setLinkStatus(text) { if (LINK.status) LINK.status.textContent = text; }
+
+async function runIntegrityCheck() {
+  const res = await window.TP.integrity.verify('./');
+  integrityState.ok = res.ok;
+  integrityState.rootHash = res.rootHash;
+  integrityState.done = true;
+  const short = res.rootHash ? res.rootHash.slice(0, 8) : '';
+  if (res.ok) {
+    LINK.badge.textContent = `✅ ${short}`;
+    LINK.badge.className = 'px-2 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-xs font-semibold text-emerald-300';
+    LINK.badge.title = `App íntegra. Hash raíz SHA-256: ${res.rootHash}`;
+  } else {
+    LINK.badge.textContent = '⚠️ Alterada';
+    LINK.badge.className = 'px-2 py-1 rounded-full bg-red-500/20 border border-red-500/60 text-xs font-bold text-red-300';
+    LINK.badge.title = res.error ? `No se pudo verificar: ${res.error}` : `Archivos que no coinciden: ${res.mismatches.join(', ')}`;
+  }
+}
+
+function createSyncLink() {
+  syncLink = new window.TP.Sync({
+    role: 'passenger',
+    getIntegrity: () => ({ rootHash: integrityState.rootHash, integrityOk: integrityState.ok }),
+    onState: (st) => {
+      const labels = { idle: 'Sin vincular.', pairing: 'Emparejando…', connected: '✅ Conectado con el conductor', disconnected: '⚠️ Conexión perdida. Vuelve a vincular.', error: '⚠️ Mensaje rechazado (firma inválida).' };
+      setLinkStatus(labels[st] || st);
+      LINK.btnDisconnect.classList.toggle('hidden', st === 'idle');
+      if (st === 'connected') { LINK.step2.classList.add('hidden'); broadcastTick(null, true); }
+    },
+    onVerifyCode: (code) => { LINK.verifyCode.textContent = code; LINK.verifyBox.classList.remove('hidden'); },
+    onHello: (info) => { LINK.mismatch.classList.toggle('hidden', !info.mismatch); },
+    onMessage: () => { /* El pasajero solo emite; el conductor puede enviar 'ack' en el futuro */ }
+  });
+}
+
+function initLinkListeners() {
+  document.getElementById('btnOpenLink').addEventListener('click', () => LINK.modal.classList.remove('hidden'));
+  document.getElementById('btnCloseLinkModal').addEventListener('click', () => {
+    if (stopScan) { stopScan(); stopScan = null; }
+    LINK.video.classList.add('hidden');
+    LINK.modal.classList.add('hidden');
+  });
+
+  document.getElementById('btnGenerateInvite').addEventListener('click', async () => {
+    try {
+      if (!window.RTCPeerConnection) throw new Error('Este navegador no soporta WebRTC');
+      setLinkStatus('Generando invitación…');
+      if (!syncLink) createSyncLink();
+      const code = await syncLink.createOffer();
+      LINK.inviteCode.value = code;
+      LINK.inviteCode.classList.remove('hidden');
+      LINK.btnCopy.classList.remove('hidden');
+      LINK.inviteQr.classList.remove('hidden');
+      LINK.verifyBox.classList.add('hidden');
+      LINK.mismatch.classList.add('hidden');
+      LINK.step2.classList.remove('hidden');
+      try { await window.TP.qr.render(LINK.inviteQr, code); }
+      catch (e) { LINK.inviteQr.classList.add('hidden'); /* sin internet: queda el código de texto */ }
+      setLinkStatus('Muestra este QR al conductor.');
+    } catch (e) { setLinkStatus('Error: ' + e.message); }
+  });
+
+  LINK.btnCopy.addEventListener('click', () => {
+    navigator.clipboard && navigator.clipboard.writeText(LINK.inviteCode.value);
+  });
+
+  async function applyAnswer(code) {
+    try { await syncLink.acceptAnswer(code); setLinkStatus('Conectando…'); }
+    catch (e) { setLinkStatus('Código inválido: ' + e.message); }
+  }
+  document.getElementById('btnApplyAnswer').addEventListener('click', () => applyAnswer(LINK.answer.value));
+  document.getElementById('btnScanAnswer').addEventListener('click', async () => {
+    LINK.video.classList.remove('hidden');
+    stopScan = await window.TP.qr.scan(LINK.video, (text) => {
+      LINK.video.classList.add('hidden'); stopScan = null; applyAnswer(text);
+    }, () => { LINK.video.classList.add('hidden'); setLinkStatus('No se pudo abrir la cámara; pega el código.'); });
+  });
+
+  document.getElementById('btnForceLink').addEventListener('click', () => {
+    if (syncLink) syncLink.unblock();
+    LINK.mismatch.classList.add('hidden');
+    broadcastTick(null, true);
+  });
+  LINK.btnDisconnect.addEventListener('click', () => {
+    if (syncLink) syncLink.close();
+    LINK.verifyBox.classList.add('hidden');
+    LINK.mismatch.classList.add('hidden');
+    LINK.step2.classList.add('hidden');
+  });
+}
+
 // Inicialización cuando carga el documento
 document.addEventListener('DOMContentLoaded', () => {
   initEventListeners();
+  initLinkListeners();
+  runIntegrityCheck();
   initMapIfNeeded();
   updateDisplays();
 });
