@@ -534,6 +534,14 @@
         <p>⚠️ La app del conductor no coincide con la tuya (hash distinto o no verificado). Por seguridad no se envían datos del viaje.</p>
         <button id="btnForceLink" class="bg-red-500 hover:bg-red-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Enviar de todos modos</button>
       </div>
+      <div class="border-t border-slate-700 pt-3 space-y-2">
+        <h4 class="text-sm font-bold text-amber-400">Plan B: sin conexión</h4>
+        <p class="text-xs text-slate-400">Si el emparejamiento falla (redes distintas), genera un código/QR del viaje actual y pásalo al conductor.</p>
+        <button id="btnSnapshot" class="w-full bg-slate-800 border border-slate-700 text-slate-100 font-semibold py-2 rounded-xl">🧾 Generar código del viaje</button>
+        <div id="snapshotQr" class="bg-white rounded-xl p-2 hidden"></div>
+        <textarea id="snapshotCode" readonly rows="3" class="hidden w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[10px] font-mono text-slate-300"></textarea>
+        <button id="btnCopySnapshot" class="hidden w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold py-1.5 rounded-lg">📋 Copiar código</button>
+      </div>
       <button id="btnDisconnectLink" class="hidden w-full bg-slate-800 border border-red-500/50 text-red-300 text-sm font-semibold py-2 rounded-xl">Desvincular</button>
     </div>
   </div>

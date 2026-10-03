@@ -145,6 +145,7 @@
       await waitIceComplete(this.pc);
       const answerCode = await encodeDesc(this.pc.localDescription);
       await this._deriveKey(offerCode.trim(), answerCode);
+      this._watchTimeout(60000);
       return answerCode;
     }
 
@@ -152,6 +153,16 @@
       if (!this.pc || !this._offerCode) throw new Error('Primero genera el código de invitación');
       await this._deriveKey(this._offerCode, answerCode.trim());
       await this.pc.setRemoteDescription(await decodeDesc(answerCode));
+      this._watchTimeout();
+    }
+
+    /** Si no se conecta a tiempo (p. ej. redes distintas), avisa para ofrecer el modo sin conexión. */
+    _watchTimeout(ms = 25000) {
+      clearTimeout(this._timer);
+      const pc = this.pc;
+      this._timer = setTimeout(() => {
+        if (this.pc === pc && !this.connected) this.opts.onState('timeout');
+      }, ms);
     }
 
     async send(type, data, force) {
@@ -193,6 +204,7 @@
     unblock() { this.blocked = false; }
 
     close(silent) {
+      clearTimeout(this._timer);
       try { if (this.channel) this.channel.close(); } catch (e) { /* noop */ }
       try { if (this.pc) this.pc.close(); } catch (e) { /* noop */ }
       this.channel = null;
@@ -268,7 +280,35 @@
     return stop;
   }
 
+  // ---------- Resumen de viaje sin conexión (plan B cuando falla el emparejamiento) ----------
+  // Código = "TPR1." + deflate(JSON) en base64url + "." + 8 hex de SHA-256 (detecta errores de copiado/alteración).
+  // Sin clave compartida NO autentica al emisor: el conductor debe recalcular y comparar el total.
+  const Snapshot = {
+    async encode(data, rootHash) {
+      const raw = enc.encode(JSON.stringify({ d: data, h: rootHash || '', ts: Date.now() }));
+      const body = typeof CompressionStream === 'function'
+        ? 'TPR1.' + toB64Url(await pipe(raw, new CompressionStream('deflate-raw')))
+        : 'TPR0.' + toB64Url(raw);
+      const sum = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(body)));
+      const hex = Array.from(sum.slice(0, 4)).map(b => b.toString(16).padStart(2, '0')).join('');
+      return body + '.' + hex;
+    },
+    async decode(code) {
+      code = String(code || '').trim();
+      const dot = code.lastIndexOf('.');
+      const body = code.slice(0, dot), hex = code.slice(dot + 1);
+      const sum = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(body)));
+      const expected = Array.from(sum.slice(0, 4)).map(b => b.toString(16).padStart(2, '0')).join('');
+      if (!body.startsWith('TPR') || !sameHex(expected, hex)) throw new Error('Código dañado o incompleto (el checksum no coincide)');
+      const bytes = fromB64Url(body.slice(5));
+      const raw = body.startsWith('TPR1.') ? await pipe(bytes, new DecompressionStream('deflate-raw')) : bytes;
+      const o = JSON.parse(dec.decode(raw));
+      return { data: o.d, rootHash: o.h, ts: o.ts };
+    }
+  };
+
   const TP = root.TP = root.TP || {};
   TP.Sync = Sync;
+  TP.Snapshot = Snapshot;
   TP.qr = { render: renderQR, scan: scanQR };
 })(window);

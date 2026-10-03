@@ -52,6 +52,16 @@
       <p id="pairStatus" class="text-sm text-slate-300"></p>
     </section>
 
+    <section class="bg-slate-900 border border-slate-700 rounded-2xl p-4 space-y-2">
+      <h2 class="font-bold text-amber-400">Plan B: recibir resumen sin conexión</h2>
+      <p class="text-xs text-slate-400">Si no logras emparejar, el pasajero genera un código/QR del viaje y tú lo escaneas o pegas aquí.</p>
+      <video id="snapVideo" class="hidden w-full rounded-xl bg-black" playsinline muted></video>
+      <button id="btnScanSnap" class="w-full bg-slate-800 border border-slate-700 text-slate-100 font-semibold py-2 rounded-xl">📷 Escanear resumen</button>
+      <textarea id="snapCode" rows="2" placeholder="…o pega el código (TPR1.…)" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[10px] font-mono text-slate-200"></textarea>
+      <button id="btnLoadSnap" class="w-full bg-slate-800 border border-slate-700 text-slate-100 font-semibold py-2 rounded-xl">Cargar resumen</button>
+      <p id="snapStatus" class="text-xs text-slate-300"></p>
+    </section>
+
     <div id="mismatchBox" class="hidden bg-red-900/40 border border-red-500 rounded-xl p-3 text-sm text-red-200">
       ⚠️ La app del pasajero no coincide con esta (hash distinto o no verificado). No confíes en los datos hasta confirmar.
     </div>

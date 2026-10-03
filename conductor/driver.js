@@ -77,9 +77,10 @@ function createSync() {
     role: 'driver',
     getIntegrity: () => ({ rootHash: integrityState.rootHash, integrityOk: integrityState.ok }),
     onState: (st) => {
-      const labels = { idle: 'Sin vincular', pairing: 'Emparejando…', connected: '✅ Conectado', disconnected: '⚠️ Desconectado', error: '⚠️ Mensaje rechazado' };
+      const labels = { idle: 'Sin vincular', pairing: 'Emparejando…', connected: '✅ Conectado', disconnected: '⚠️ Desconectado', timeout: '⏱️ Sin conexión', error: '⚠️ Mensaje rechazado' };
       $('connBadge').textContent = labels[st] || st;
       if (st === 'connected') $('pairStatus').textContent = 'Conectado. Esperando datos del viaje…';
+      if (st === 'timeout') $('pairStatus').textContent = 'No se logró conectar (¿redes distintas?). Prueba la misma Wi-Fi o usa el Plan B de abajo.';
       if (st === 'disconnected') $('pairStatus').textContent = 'Conexión perdida. Pide al pasajero una nueva invitación.';
     },
     onVerifyCode: (code) => { $('verifyCode').textContent = code; $('verifyBox').classList.remove('hidden'); },
@@ -118,6 +119,28 @@ $('btnScanOffer').addEventListener('click', async () => {
   }, () => { $('scanVideo').classList.add('hidden'); $('pairStatus').textContent = 'No se pudo abrir la cámara; pega el código.'; });
 });
 $('btnCopyAnswer').addEventListener('click', () => { navigator.clipboard && navigator.clipboard.writeText($('answerCode').value); });
+
+async function loadSnapshot(code) {
+  const st = $('snapStatus');
+  try {
+    const snap = await TP.Snapshot.decode(code);
+    renderTick(snap.data);
+    const sameApp = snap.rootHash && snap.rootHash === integrityState.rootHash;
+    const age = Math.round((Date.now() - snap.ts) / 60000);
+    st.textContent = `Resumen cargado (generado hace ${age} min). App del pasajero: ${sameApp ? '✅ misma versión' : '⚠️ versión distinta'}. Sin conexión no se puede autenticar al emisor: confía en el total recalculado.`;
+    st.className = 'text-xs ' + (sameApp ? 'text-emerald-400' : 'text-amber-400');
+  } catch (e) {
+    st.textContent = 'No se pudo leer: ' + e.message;
+    st.className = 'text-xs text-red-400';
+  }
+}
+$('btnLoadSnap').addEventListener('click', () => loadSnapshot($('snapCode').value));
+$('btnScanSnap').addEventListener('click', async () => {
+  $('snapVideo').classList.remove('hidden');
+  await TP.qr.scan($('snapVideo'), (text) => {
+    $('snapVideo').classList.add('hidden'); $('snapCode').value = text; loadSnapshot(text);
+  }, () => { $('snapVideo').classList.add('hidden'); $('snapStatus').textContent = 'No se pudo abrir la cámara; pega el código.'; });
+});
 
 runIntegrityCheck();
 

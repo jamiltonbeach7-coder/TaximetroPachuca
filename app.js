@@ -1485,6 +1485,15 @@ const LINK = {
 };
 let stopScan = null;
 
+function currentSnapshot() {
+  const total = window.TP.calculateFare(state.totalDistanceKm, state.totalWaitSeconds, state.tariff, state.nightFareActive, state.nightSurchargePct).total;
+  return {
+    status: state.status, distanceKm: state.totalDistanceKm, waitSeconds: state.totalWaitSeconds,
+    elapsedSeconds: state.totalElapsedSeconds, speedKmh: 0, tariff: state.tariff, tariffKey: state.tariffKey,
+    isNight: state.nightFareActive, nightPct: state.nightSurchargePct, total
+  };
+}
+
 function broadcastTick(total, force) {
   if (!syncLink || !syncLink.connected) return;
   const now = Date.now();
@@ -1528,7 +1537,7 @@ function createSyncLink() {
     role: 'passenger',
     getIntegrity: () => ({ rootHash: integrityState.rootHash, integrityOk: integrityState.ok }),
     onState: (st) => {
-      const labels = { idle: 'Sin vincular.', pairing: 'Emparejando…', connected: '✅ Conectado con el conductor', disconnected: '⚠️ Conexión perdida. Vuelve a vincular.', error: '⚠️ Mensaje rechazado (firma inválida).' };
+      const labels = { idle: 'Sin vincular.', pairing: 'Emparejando…', connected: '✅ Conectado con el conductor', disconnected: '⚠️ Conexión perdida. Vuelve a vincular.', timeout: '⏱️ No se logró conectar (¿redes distintas?). Usa la misma Wi-Fi o el Plan B sin conexión.', error: '⚠️ Mensaje rechazado (firma inválida).' };
       setLinkStatus(labels[st] || st);
       LINK.btnDisconnect.classList.toggle('hidden', st === 'idle');
       if (st === 'connected') { LINK.step2.classList.add('hidden'); broadcastTick(null, true); }
@@ -1580,6 +1589,20 @@ function initLinkListeners() {
     stopScan = await window.TP.qr.scan(LINK.video, (text) => {
       LINK.video.classList.add('hidden'); stopScan = null; applyAnswer(text);
     }, () => { LINK.video.classList.add('hidden'); setLinkStatus('No se pudo abrir la cámara; pega el código.'); });
+  });
+
+  document.getElementById('btnSnapshot').addEventListener('click', async () => {
+    const code = await window.TP.Snapshot.encode(currentSnapshot(), integrityState.rootHash);
+    const ta = document.getElementById('snapshotCode');
+    const qr = document.getElementById('snapshotQr');
+    ta.value = code;
+    ta.classList.remove('hidden');
+    document.getElementById('btnCopySnapshot').classList.remove('hidden');
+    qr.classList.remove('hidden');
+    try { await window.TP.qr.render(qr, code); } catch (e) { qr.classList.add('hidden'); }
+  });
+  document.getElementById('btnCopySnapshot').addEventListener('click', () => {
+    navigator.clipboard && navigator.clipboard.writeText(document.getElementById('snapshotCode').value);
   });
 
   document.getElementById('btnForceLink').addEventListener('click', () => {
