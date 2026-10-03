@@ -192,6 +192,19 @@ $('btnScanAnswer').addEventListener('click', async () => {
 });
 
 // ---- Sincronización solo por QR (clave compartida ECDH) ----
+function showSyncedHome() {
+  $('pairSection').classList.add('hidden');
+  $('syncedBox').classList.remove('hidden');
+  $('btnOfflineDone').classList.add('hidden');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+$('btnOfflineDone').addEventListener('click', showSyncedHome);
+$('btnResync').addEventListener('click', () => {
+  offlineKey = null; TP.OfflinePair.clear();
+  $('syncedBox').classList.add('hidden');
+  $('pairSection').classList.remove('hidden');
+  $('connBadge').textContent = 'Sin vincular';
+});
 const offStatus = (t) => { $('offlineStatus').textContent = t; };
 async function showOfflineCode(code) {
   $('offlineCode').value = code;
@@ -222,6 +235,8 @@ async function applyOffline(code) {
     } else {
       offStatus(`Sincronizado ✅ (código de verificación ${r.verifyCode}, debe ser igual en el otro). Al terminar el viaje escanea su resumen firmado.`);
     }
+    $('btnOfflineDone').classList.remove('hidden');
+    if (!r.replyCode) setTimeout(showSyncedHome, 1200);
     offlinePair = null;
   } catch (e) { offStatus('No se pudo sincronizar: ' + e.message); }
 }
@@ -232,7 +247,7 @@ $('btnOfflineScan').addEventListener('click', async () => {
     $('offlineVideo').classList.add('hidden'); $('offlineIn').value = text; routeCode(text);
   }, () => { $('offlineVideo').classList.add('hidden'); offStatus('No se pudo abrir la cámara; pega el código.'); });
 });
-TP.OfflinePair.load().then((p) => { if (p) { offlineKey = p.key; $('connBadge').textContent = '🔑 Sincronizado (QR)'; } });
+TP.OfflinePair.load().then((p) => { if (p) { offlineKey = p.key; $('connBadge').textContent = '🔑 Sincronizado (QR)'; showSyncedHome(); } });
 
 $('integrityBadge').addEventListener('click', () => alert(integrityState.report || 'Verificando…'));
 runIntegrityCheck();

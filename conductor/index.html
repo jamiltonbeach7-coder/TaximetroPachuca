@@ -29,6 +29,13 @@
 
   <main class="flex-1 max-w-3xl w-full mx-auto p-4 space-y-4">
 
+    <!-- Sincronizado por QR: espera de resumen -->
+    <section id="syncedBox" class="hidden bg-emerald-900/30 border border-emerald-500/60 rounded-2xl p-4 space-y-2 text-emerald-100">
+      <h2 class="font-bold">🔑 Sincronizado por QR con el pasajero</h2>
+      <p class="text-sm">Cuando el pasajero termine el viaje, escanea o pega su resumen firmado en "Plan B: recibir resumen" (abajo) y verás aquí el total verificado.</p>
+      <button id="btnResync" class="bg-slate-800 border border-slate-600 text-slate-200 text-xs font-semibold px-3 py-1.5 rounded-lg">Volver a vincular</button>
+    </section>
+
     <!-- Emparejamiento -->
     <section id="pairSection" class="bg-slate-900 border border-slate-700 rounded-2xl p-4 space-y-3">
       <h2 class="font-bold text-amber-400">Vincular con el pasajero</h2>
@@ -71,6 +78,7 @@
         <textarea id="offlineIn" rows="2" placeholder="…o pega el código del otro (TPK1.…)" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[10px] font-mono text-slate-200"></textarea>
         <button id="btnOfflineApply" class="w-full bg-slate-800 border border-slate-700 text-slate-100 font-semibold py-2 rounded-xl">Sincronizar</button>
         <p id="offlineStatus" class="text-xs text-slate-300"></p>
+        <button id="btnOfflineDone" class="hidden w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 rounded-xl">✅ Listo, el pasajero ya escaneó mi QR</button>
       </div>
 
       <div id="verifyBox" class="hidden bg-slate-800 border border-slate-700 rounded-xl p-3 text-center">

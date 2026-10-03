@@ -1690,6 +1690,13 @@ function initLinkListeners() {
   });
 
   // ---- Sincronización solo por QR (clave compartida ECDH) ----
+  function goHomeSynced() {
+    LINK.modal.classList.add('hidden');
+    document.getElementById('btnOfflineDone').classList.add('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    refreshSyncUI();
+  }
+  document.getElementById('btnOfflineDone').addEventListener('click', goHomeSynced);
   const offStatus = (t) => { document.getElementById('offlineStatus').textContent = t; };
   async function showOfflineCode(code) {
     document.getElementById('offlineCode').value = code;
@@ -1721,7 +1728,9 @@ function initLinkListeners() {
         offStatus(`Sincronizado ✅ (código de verificación ${r.verifyCode}, debe ser igual en el otro).`);
       }
       refreshSyncUI();
-      setTimeout(() => { if (!r.replyCode) { LINK.modal.classList.add('hidden'); window.scrollTo({ top: 0, behavior: 'smooth' }); } }, 1500);
+      // Si ya no falta mostrar mi QR al otro, vuelve solo; si falta, un botón permite volver cuando el otro lo haya escaneado
+      document.getElementById('btnOfflineDone').classList.remove('hidden');
+      if (!r.replyCode) setTimeout(goHomeSynced, 1200);
       offlinePair = null;
     } catch (e) { offStatus('No se pudo sincronizar: ' + e.message); }
   }
