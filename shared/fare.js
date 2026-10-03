@@ -5,36 +5,36 @@
 (function (root) {
   const TARIFF_PRESETS = {
     pachuca_2026: {
-      name: "Propuesta Pachuca 2026 ($50.00 base)",
-      shortName: "Pachuca ($50 base / 4km + $4.50/km)",
-      baseFare: 50.00,
+      name: "Oficial Semot 2026 ($45.00 base)",
+      shortName: "Oficial 2026 ($45 base / 4km + $4/km)",
+      baseFare: 45.00,
       baseKm: 4.0,
-      pricePerKm: 4.50,
+      pricePerKm: 4.00,
       pricePerWaitMinute: 1.00
     },
     historica: {
-      name: "Referencia Histórica ($38.50 base)",
-      shortName: "Histórica ($38.50 base / 4km + $3.50/km)",
-      baseFare: 38.50,
+      name: "Tarifa anterior a sept. 2026 ($38.00 base)",
+      shortName: "Anterior ($38 base / 4km + $3/km)",
+      baseFare: 38.00,
       baseKm: 4.0,
-      pricePerKm: 3.50,
+      pricePerKm: 3.00,
       pricePerWaitMinute: 1.00
     },
     custom: {
       name: "Tarifa Personalizada",
       shortName: "Personalizada",
-      baseFare: 50.00,
+      baseFare: 45.00,
       baseKm: 4.0,
-      pricePerKm: 4.50,
+      pricePerKm: 4.00,
       pricePerWaitMinute: 1.00
     }
   };
 
   function calculateFare(distanceKm, waitSeconds, tariff, isNight, nightSurchargePct) {
     const nightPct = nightSurchargePct === undefined ? 20 : nightSurchargePct;
-    const baseFare = Number(tariff.baseFare) || 50.00;
+    const baseFare = Number(tariff.baseFare) || 45.00;
     const baseKm = Number(tariff.baseKm) || 4.0;
-    const pricePerKm = Number(tariff.pricePerKm) || 4.50;
+    const pricePerKm = Number(tariff.pricePerKm) || 4.00;
     const pricePerWaitMin = Number(tariff.pricePerWaitMinute) || 1.00;
 
     // Kilómetros adicionales que exceden el banderazo

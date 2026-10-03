@@ -155,7 +155,7 @@
         <div>
           <div class="text-xs text-slate-400 font-medium">Tarifa aplicada:</div>
           <div id="activeTariffLabel" class="text-xs sm:text-sm font-bold text-amber-400">
-            Pachuca 2026 ($50.00 base / 4km + $4.50/km)
+            Oficial 2026 ($45 base / 4km + $4/km)
           </div>
         </div>
       </div>
@@ -189,7 +189,7 @@
         <div class="flex items-baseline justify-center">
           <span class="text-3xl sm:text-4xl font-black text-amber-400 mr-1">$</span>
           <span id="totalFareDisplay" class="text-6xl sm:text-7xl md:text-8xl font-black text-emerald-400 tracking-tight font-digital">
-            50.00
+            45.00
           </span>
           <span class="text-sm sm:text-base font-bold text-slate-400 ml-2">MXN</span>
         </div>
@@ -282,10 +282,10 @@
       <div class="space-y-2 text-xs sm:text-sm text-slate-300 font-mono bg-slate-950/60 p-3 rounded-xl border border-slate-800">
         <div class="flex justify-between items-center py-0.5">
           <span class="text-slate-400">1. Banderazo inicial (incluye hasta <span id="auditBaseKm">4.0</span> km):</span>
-          <span class="font-bold text-slate-200">$<span id="auditBaseFare">50.00</span></span>
+          <span class="font-bold text-slate-200">$<span id="auditBaseFare">45.00</span></span>
         </div>
         <div class="flex justify-between items-center py-0.5">
-          <span class="text-slate-400">2. Km adicional (<span id="auditExtraKm">0.00</span> km × $<span id="auditPriceKm">4.50</span>):</span>
+          <span class="text-slate-400">2. Km adicional (<span id="auditExtraKm">0.00</span> km × $<span id="auditPriceKm">4.00</span>):</span>
           <span class="font-bold text-slate-200">$<span id="auditExtraDistFare">0.00</span></span>
         </div>
         <div class="flex justify-between items-center py-0.5">
@@ -298,7 +298,7 @@
         </div>
         <div class="border-t border-slate-700 pt-2 flex justify-between items-center text-sm sm:text-base font-sans font-bold text-emerald-400">
           <span>Total Exacto Calculado:</span>
-          <span class="font-digital text-lg">$<span id="auditTotalFare">50.00</span> MXN</span>
+          <span class="font-digital text-lg">$<span id="auditTotalFare">45.00</span> MXN</span>
         </div>
       </div>
       
@@ -599,29 +599,29 @@
 
       <!-- Opciones Predefinidas -->
       <div class="space-y-2.5">
-        <!-- Opción 1: Propuesta FUTVEH / Pachuca 2026 -->
+        <!-- Opción 1: Tarifa oficial Semot 2026 (vigente desde el 23/09/2026) -->
         <label class="block p-3 rounded-xl border border-slate-700 bg-slate-800/60 cursor-pointer hover:border-amber-500/50 transition">
           <div class="flex items-start gap-2.5">
             <input type="radio" name="tariffPreset" value="pachuca_2026" checked class="mt-1 accent-amber-500 text-amber-500">
             <div>
-              <div class="text-sm font-bold text-slate-100">Propuesta Pachuca ($50.00 base)</div>
+              <div class="text-sm font-bold text-slate-100">Oficial Semot 2026 ($45.00 base)</div>
               <div class="text-xs text-slate-400 mt-0.5">
-                Banderazo: <strong>$50.00</strong> (cubre primeros 4.0 km)<br>
-                Km adicional: <strong>$4.50</strong> | Minuto en tráfico: <strong>$1.00</strong>
+                Banderazo: <strong>$45.00</strong> (cubre primeros 4.0 km)<br>
+                Km adicional: <strong>$4.00</strong> | Minuto en tráfico: <strong>$1.00</strong>
               </div>
             </div>
           </div>
         </label>
 
-        <!-- Opción 2: Histórica Taxi Contigo -->
+        <!-- Opción 2: Tarifa anterior a septiembre de 2026 -->
         <label class="block p-3 rounded-xl border border-slate-700 bg-slate-800/60 cursor-pointer hover:border-amber-500/50 transition">
           <div class="flex items-start gap-2.5">
             <input type="radio" name="tariffPreset" value="historica" class="mt-1 accent-amber-500 text-amber-500">
             <div>
-              <div class="text-sm font-bold text-slate-100">Referencia Histórica ($38.50 base)</div>
+              <div class="text-sm font-bold text-slate-100">Tarifa anterior a sept. 2026 ($38.00 base)</div>
               <div class="text-xs text-slate-400 mt-0.5">
-                Banderazo: <strong>$38.50</strong> (cubre primeros 4.0 km)<br>
-                Km adicional: <strong>$3.50</strong> | Minuto en tráfico: <strong>$1.00</strong>
+                Banderazo: <strong>$38.00</strong> (cubre primeros 4.0 km)<br>
+                Km adicional: <strong>$3.00</strong> | Minuto en tráfico: <strong>$1.00</strong>
               </div>
             </div>
           </div>
@@ -644,7 +644,7 @@
         <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="block text-slate-400 font-semibold mb-1">Banderazo ($ MXN)</label>
-            <input type="number" id="inputCustomBase" step="0.5" value="50.00" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-bold focus:border-amber-500 outline-none">
+            <input type="number" id="inputCustomBase" step="0.5" value="45.00" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-bold focus:border-amber-500 outline-none">
           </div>
           <div>
             <label class="block text-slate-400 font-semibold mb-1">Km incluidos en base</label>
@@ -654,7 +654,7 @@
         <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="block text-slate-400 font-semibold mb-1">$ por Km Extra</label>
-            <input type="number" id="inputCustomExtraKm" step="0.25" value="4.50" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-bold focus:border-amber-500 outline-none">
+            <input type="number" id="inputCustomExtraKm" step="0.25" value="4.00" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-bold focus:border-amber-500 outline-none">
           </div>
           <div>
             <label class="block text-slate-400 font-semibold mb-1">$ por Min Tráfico</label>
@@ -745,7 +745,7 @@
         <!-- Resultado Estimado -->
         <div class="bg-emerald-950/40 border border-emerald-500/40 p-4 rounded-2xl text-center space-y-1">
           <div class="text-xs uppercase font-bold text-emerald-400">Tarifa Estimada Justa</div>
-          <div class="text-3xl font-black text-emerald-400 font-digital" id="estimatorResultPrice">$50.00 MXN</div>
+          <div class="text-3xl font-black text-emerald-400 font-digital" id="estimatorResultPrice">$45.00 MXN</div>
           <div class="text-[11px] text-slate-300" id="estimatorResultBreakdown">Banderazo base ($50) cubre los primeros 4 km.</div>
         </div>
       </div>
@@ -794,7 +794,7 @@
         <div class="border-t border-dashed border-slate-400 pt-2 space-y-1 text-[11px]">
           <div class="flex justify-between">
             <span>Banderazo Inicial (4 km):</span>
-            <span id="ticketBaseFare">$50.00</span>
+            <span id="ticketBaseFare">$45.00</span>
           </div>
           <div class="flex justify-between">
             <span>Km Adicionales:</span>
@@ -806,7 +806,7 @@
           </div>
           <div class="flex justify-between text-base font-black border-t border-slate-900 pt-2">
             <span>TOTAL:</span>
-            <span id="ticketTotalFare" class="text-emerald-700">$50.00 MXN</span>
+            <span id="ticketTotalFare" class="text-emerald-700">$45.00 MXN</span>
           </div>
         </div>
 

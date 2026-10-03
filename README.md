@@ -20,8 +20,8 @@ En Pachuca, la ausencia de una regulación generalizada de taxímetros ha genera
 - 📱 **Diseño Accesible (Cero Fricción)**: Números gigantes tipo LED/OLED, botones de alto contraste (Iniciar / Pausar / Terminar) y estados en lenguaje natural.
 - 🔍 **Auditoría Matemática en Tiempo Real**: Muestra el desglose exacto de cada peso cobrado (Banderazo inicial + Distancia extra + Minutos de espera en semáforos/tráfico).
 - 🏷️ **Perfiles de Tarifas Transparentes**:
-  - **Pachuca 2026 (Propuesta gremio FUTVEH / SEMOT)**: Banderazo de \$50.00 (cubre primeros 4.0 km) + \$4.50 por km adicional + \$1.00 por minuto detenido.
-  - **Referencia Histórica (Taxi Contigo)**: Banderazo de \$38.50 (cubre primeros 4.0 km) + \$3.50 por km adicional + \$1.00 por minuto detenido.
+  - **Oficial Semot 2026 (vigente desde el 23/09/2026)**: Banderazo de \$45.00 (cubre primeros 4.0 km) + \$4.00 por km adicional + \$1.00 por minuto detenido. Tarifa publicada por la Secretaría de Movilidad y Transporte de Hidalgo para Pachuca de Soto y Mineral de la Reforma.
+  - **Tarifa anterior (antes de sept. 2026)**: Banderazo de \$38.00 (cubre primeros 4.0 km) + \$3.00 por km adicional + \$1.00 por minuto detenido.
   - **Tarifa Personalizada**: Ajustable libremente para otros municipios de Hidalgo (Mineral de la Reforma, Tulancingo, Tula, etc.).
 - 🔋 **Función Screen Wake Lock**: Mantiene la pantalla encendida automáticamente mientras el taxímetro está en marcha para que el celular no se bloquee.
 - 📡 **GPS con Filtro Anti-Ruido**: Algoritmo de distancia Haversine con descarte de falsos saltos satelitales y detección automática de velocidad/paradas.
@@ -40,9 +40,9 @@ El cálculo del costo total se encuentra implementado en el archivo [`app.js`](a
 
 ```javascript
 function calculateFare(distanceKm, waitSeconds, tariff, isNight) {
-  const baseFare = Number(tariff.baseFare) || 50.00;
+  const baseFare = Number(tariff.baseFare) || 45.00;
   const baseKm = Number(tariff.baseKm) || 4.0;
-  const pricePerKm = Number(tariff.pricePerKm) || 4.50;
+  const pricePerKm = Number(tariff.pricePerKm) || 4.00;
   const pricePerWaitMin = Number(tariff.pricePerWaitMinute) || 1.00;
 
   // 1. Kilómetros adicionales que exceden el banderazo
@@ -95,7 +95,7 @@ function calculateFare(distanceKm, waitSeconds, tariff, isNight) {
 #### 1. Distancia Extra sobre el Banderazo
 $$\text{extraKm} = \max(0, \text{distanceKm} - \text{baseKm})$$
 - Si el viaje dura **menos de 4.0 km**, la distancia extra es $0.00\text{ km}$ y no se cobra ningún peso adicional sobre el banderazo.
-- Si el viaje mide **6.50 km**, los primeros 4.0 km quedan cubiertos y solo se cobran $2.50\text{ km} \times \$4.50 = \$11.25$.
+- Si el viaje mide **6.50 km**, los primeros 4.0 km quedan cubiertos y solo se cobran $2.50\text{ km} \times \$4.00 = \$10.00$.
 
 #### 2. Tiempo de Espera en Tráfico y Semáforos
 $$\text{waitMinutes} = \lfloor \text{waitSeconds} / 60 \rfloor$$
@@ -123,6 +123,12 @@ $$\text{Subtotal} = \text{Banderazo Base} + (\text{extraKm} \times \text{Precio 
 - **Verificación de integridad**: `integrity.json` guarda el SHA-256 de cada archivo y un hash raíz. Al abrir, cada app descarga sus archivos, los hashea y muestra ✅/⚠️ en la cabecera; al emparejarse intercambian el hash raíz y, si difiere, no se envían datos hasta confirmar.
 - **Tras editar cualquier archivo**: `node tools/build-manifest.mjs` y sube también `integrity.json`.
 - **Limitación**: una app que se verifica a sí misma no protege si el servidor sirve código malicioso desde el inicio. Compara el hash raíz publicado aquí con el que muestra la insignia (pasa el cursor sobre ella).
+
+---
+
+## 📜 Fuente de las tarifas y notas
+
+Tarifa oficial según el acuerdo publicado el 22/09/2026 en el Periódico Oficial del Estado de Hidalgo (primera fase, Pachuca y Mineral de la Reforma, +20 %): banderazo \$45 por los primeros 4 km y \$4 por km adicional. La norma indica que el taxímetro suma \$1 al avanzar 150 m en 60 s o al circular a menos de 15 km/h; **esta app cobra \$1 por minuto completo detenido** (velocidad casi nula) como aproximación auditable y no aplica recargo nocturno por defecto, ya que no se encontró una cifra oficial (es opcional en la configuración). Revisa el texto oficial para confirmar la regla exacta de espera.
 
 ---
 

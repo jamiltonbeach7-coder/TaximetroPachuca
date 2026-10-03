@@ -1101,9 +1101,9 @@ function saveTariffSettings() {
     state.tariff = {
       name: "Tarifa Personalizada",
       shortName: "Personalizada",
-      baseFare: parseFloat(DOM.inputCustomBase.value) || 50.0,
+      baseFare: parseFloat(DOM.inputCustomBase.value) || 45.0,
       baseKm: parseFloat(DOM.inputCustomBaseKm.value) || 4.0,
-      pricePerKm: parseFloat(DOM.inputCustomExtraKm.value) || 4.50,
+      pricePerKm: parseFloat(DOM.inputCustomExtraKm.value) || 4.0,
       pricePerWaitMinute: parseFloat(DOM.inputCustomMinWait.value) || 1.00
     };
   } else {
