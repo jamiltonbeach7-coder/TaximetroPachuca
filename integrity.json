@@ -1,20 +1,21 @@
 {
   "version": 1,
-  "generated": "2026-10-03T05:59:33.776Z",
-  "rootHash": "68dee85fa11bb8c25572d80ca9a810c3f91ac0d98ac428df7fb90bc0f9238ec4",
+  "generated": "2026-10-03T06:17:25.571Z",
+  "rootHash": "9c80cd808149951d15f4dc4e2be3c9e52b943a58ff11a996cd1af0904df30032",
   "files": {
-    "app.js": "d472d438f19bd65b6d61587ecbc821893fa4e0408a64115969c24b90d75b4df6",
-    "conductor/driver.js": "f1415241c3a60d875fab3c3e9ad32af8cc3c103a785ffac0954c96edf438eb65",
-    "conductor/index.html": "b1c3bac59e8346d7dee84fb42859fcffeb62f3ae712cb562c088e148e6cbc12e",
+    "app.js": "38ba274a2b93b3912bc5b3498d765aa65ea893ee7e80c6a93697852378bd2b7a",
+    "conductor/driver.js": "ac16c20b8f1ceba757330a32ce5b98d691e15d63e6d7fa9d241f1530f51f237f",
+    "conductor/index.html": "88c9a258c45d73d88166649e9dd31b9ac81fae9ba5b84a3882d5546aa413d08c",
     "conductor/manifest.json": "169836cb1fba192c12fb733ab27d66e57660d14fc93e9778cd6b5fb15e2afc13",
     "icon.svg": "6deee259a1a4217f13c619743d818252744ddc96b2c316c384af6cc4fbfa7624",
-    "index.html": "fdc489b06bbf3f3118e6ca65b31f374e0bd45a895ea88478433ec3bf3bf93eec",
+    "index.html": "eafd775d955913a60475691203730dad078142548c6cafaf65112ffecd1c2446",
     "manifest.json": "2a8b4d7b12619e3062cac5c3511d0f30389d9418803cb9cd0920716bbb767f14",
     "shared/fare.js": "b7b2d98540c8ed088b7f81915eb5fabee7470ddd5d1a1fd4bd6a65ee3722b268",
     "shared/integrity.js": "5351f514cf96783abab70d7e1fa2b14f6b3d128b959b687361acb0b64824b30f",
+    "shared/mqtt-sync.js": "26931aa76b0ca2e4b82f4557efac8f49071d022bd33b979110ef98043a431d79",
     "shared/storage.js": "22ef147448f8aa6f35d9401f70ae90b28395a95a59e1e8b7530c7b534b58c200",
-    "shared/sync.js": "695b84abde5b91fc74709580c4d314ee012705bd8742ceb9f40b22a7941167dd",
+    "shared/sync.js": "7d6701c49da8101b28c3f687054dfa16391da4664095c6f5425198e8562fa712",
     "style.css": "5f56c0f847d52dc60309373af5f6d32fdd2d5d9b7d348bf25f8e540522fb21e8",
-    "sw.js": "0bc725f561aa3b847dd2125a77a3694561c4907e1c2dca81f186dd4da1a6053c"
+    "sw.js": "3aa096e6c051a78562621de516cd57a37182ea409847127353e825d56af92594"
   }
 }

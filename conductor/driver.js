@@ -10,6 +10,8 @@ let stopScan = null;
 let lastTotalOk = true;
 let offlineKey = null;
 let offlinePair = null;
+let offlineSecret = null;
+let mqttLink = null;
 
 function formatTime(totalSeconds) {
   const s = Math.floor(Math.max(0, Number(totalSeconds) || 0));
@@ -212,7 +214,9 @@ function showSyncedHome() {
 }
 $('btnOfflineDone').addEventListener('click', showSyncedHome);
 $('btnResync').addEventListener('click', () => {
-  offlineKey = null; TP.OfflinePair.clear();
+  offlineKey = null; offlineSecret = null; TP.OfflinePair.clear();
+  if (mqttLink) { mqttLink.stop(); mqttLink = null; }
+  $('mqttStatus').textContent = '';
   $('syncedBox').classList.add('hidden');
   $('pairSection').classList.remove('hidden');
   $('connBadge').textContent = 'Sin vincular';
@@ -240,6 +244,8 @@ async function applyOffline(code) {
     }
     TP.OfflinePair.save(r.secret);
     offlineKey = await TP.OfflinePair.keyFrom(r.secret);
+    offlineSecret = r.secret;
+    applyMqttSetting();
     $('connBadge').textContent = '🔑 Sincronizado (QR)';
     if (r.replyCode) {
       await showOfflineCode(r.replyCode);
@@ -259,9 +265,38 @@ $('btnOfflineScan').addEventListener('click', async () => {
     $('offlineVideo').classList.add('hidden'); $('offlineIn').value = text; routeCode(text);
   }, () => { $('offlineVideo').classList.add('hidden'); offStatus('No se pudo abrir la cámara; pega el código.'); });
 });
-TP.OfflinePair.load().then((p) => { if (p) { offlineKey = p.key; $('connBadge').textContent = '🔑 Sincronizado (QR)'; showSyncedHome(); } });
+TP.OfflinePair.load().then((p) => { if (p) { offlineKey = p.key; offlineSecret = p.secret; $('connBadge').textContent = '🔑 Sincronizado (QR)'; showSyncedHome(); applyMqttSetting(); } });
 
 $('integrityBadge').addEventListener('click', () => alert(integrityState.report || 'Verificando…'));
+// ---- Seguimiento en vivo por MQTT cifrado (opcional) ----
+const MQTT_PREF = 'tp_mqtt_d';
+function applyMqttSetting() {
+  let enabled = false;
+  try { enabled = localStorage.getItem(MQTT_PREF) === '1'; } catch (e) { /* noop */ }
+  $('toggleMqtt').checked = enabled;
+  if (mqttLink) { mqttLink.stop(); mqttLink = null; }
+  if (!enabled) { $('mqttStatus').textContent = ''; return; }
+  if (!offlineSecret) { $('mqttStatus').textContent = 'Primero sincroniza por QR (sección de abajo).'; return; }
+  mqttLink = new TP.MqttLink({
+    role: 'd',
+    secret: offlineSecret,
+    getIntegrity: () => ({ rootHash: integrityState.rootHash }),
+    onState: (st, detail) => {
+      const labels = { connecting: 'Conectando al broker…', broker: 'Conectado al broker; esperando al pasajero…', peer: '✅ Pasajero en línea (cifrado)', offline: '', error: '⚠️ Error: ' + (detail || '') };
+      $('mqttStatus').textContent = labels[st] || st;
+      if (st === 'peer') $('connBadge').textContent = '✅ En vivo (internet)';
+      else if (offlineKey) $('connBadge').textContent = '🔑 Sincronizado (QR)';
+    },
+    onHello: (info) => { $('mismatchBox').classList.toggle('hidden', !info.mismatch); },
+    onMessage: (type, data) => { if (type === 'tick') renderTick(data, 'en vivo (internet)'); }
+  });
+  mqttLink.start();
+}
+$('toggleMqtt').addEventListener('change', () => {
+  try { localStorage.setItem(MQTT_PREF, $('toggleMqtt').checked ? '1' : '0'); } catch (e) { /* noop */ }
+  applyMqttSetting();
+});
+
 // ---- Historial local ----
 const refreshHistory = () => TP.store.render($('historyList'), $('historySummary'));
 $('btnExportHistory').addEventListener('click', () => TP.store.download('viajes-conductor.json', TP.store.exportJson()));

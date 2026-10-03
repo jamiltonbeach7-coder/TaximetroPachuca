@@ -36,6 +36,16 @@
       <button id="btnResync" class="bg-slate-800 border border-slate-600 text-slate-200 text-xs font-semibold px-3 py-1.5 rounded-lg">Volver a vincular</button>
     </section>
 
+    <!-- Seguimiento en vivo por internet (opcional) -->
+    <section class="bg-slate-900 border border-slate-700 rounded-2xl p-4 space-y-2">
+      <h2 class="font-bold text-amber-400">Seguimiento en vivo por internet (opcional)</h2>
+      <label class="flex items-start gap-2 text-xs text-slate-300 cursor-pointer">
+        <input type="checkbox" id="toggleMqtt" class="mt-0.5 accent-amber-500">
+        <span>Activar (requiere haber sincronizado por QR). Usa un broker MQTT público como retransmisor: los mensajes van <strong>cifrados</strong> con la clave del emparejamiento y <strong>no se guarda nada</strong>, pero el broker ve tu IP y cuándo te conectas.</span>
+      </label>
+      <p id="mqttStatus" class="text-xs text-slate-400"></p>
+    </section>
+
     <!-- Emparejamiento -->
     <section id="pairSection" class="bg-slate-900 border border-slate-700 rounded-2xl p-4 space-y-3">
       <h2 class="font-bold text-amber-400">Vincular con el pasajero</h2>
@@ -153,6 +163,7 @@
   <script src="../shared/integrity.js"></script>
   <script src="../shared/sync.js"></script>
   <script src="../shared/storage.js"></script>
+  <script src="../shared/mqtt-sync.js"></script>
   <script src="driver.js?v=8"></script>
 </body>
 </html>

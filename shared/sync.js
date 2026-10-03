@@ -418,7 +418,7 @@
     static async load() {
       try {
         const o = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-        if (o && o.s) return { key: await hmacKey(o.s), ts: o.ts };
+        if (o && o.s) return { key: await hmacKey(o.s), ts: o.ts, secret: o.s };
       } catch (e) { /* ignorar */ }
       return null;
     }

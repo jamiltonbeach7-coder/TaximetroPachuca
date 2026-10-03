@@ -592,6 +592,15 @@
       </div>
 
       <div class="border-t border-slate-700 pt-3 space-y-2">
+        <h4 class="text-sm font-bold text-amber-400">Seguimiento en vivo por internet (opcional)</h4>
+        <label class="flex items-start gap-2 text-xs text-slate-300 cursor-pointer">
+          <input type="checkbox" id="toggleMqtt" class="mt-0.5 accent-amber-500">
+          <span>Activar (requiere haber sincronizado por QR). Usa un broker MQTT público como retransmisor: los mensajes van <strong>cifrados</strong> con tu clave y <strong>no se guarda nada</strong>, pero el broker ve tu IP y cuándo te conectas.</span>
+        </label>
+        <p id="mqttStatus" class="text-xs text-slate-400"></p>
+      </div>
+
+      <div class="border-t border-slate-700 pt-3 space-y-2">
         <h4 class="text-sm font-bold text-amber-400">Plan B: sin conexión</h4>
         <p class="text-xs text-slate-400">Si el emparejamiento falla (redes distintas), genera un código/QR del viaje actual y pásalo al conductor.</p>
         <button id="btnSnapshot" class="w-full bg-slate-800 border border-slate-700 text-slate-100 font-semibold py-2 rounded-xl">🧾 Generar código del viaje</button>
@@ -923,6 +932,7 @@
   <script src="shared/integrity.js"></script>
   <script src="shared/sync.js"></script>
   <script src="shared/storage.js"></script>
+  <script src="shared/mqtt-sync.js"></script>
   <script src="app.js?v=8"></script>
 </body>
 </html>

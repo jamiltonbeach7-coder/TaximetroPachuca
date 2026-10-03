@@ -1485,6 +1485,8 @@ const integrityState = { ok: false, rootHash: '', done: false };
 let syncLink = null;
 let offlineKey = null;       // clave HMAC del emparejamiento solo-QR (persistida en este dispositivo)
 let offlinePair = null;      // acuerdo de clave en curso
+let offlineSecret = null;    // secreto del emparejamiento por QR (para MQTT cifrado)
+let mqttLink = null;         // seguimiento en vivo por broker MQTT (opcional)
 let lastTickSent = 0;
 const LINK = {
   modal: document.getElementById('linkModal'),
@@ -1512,12 +1514,20 @@ function currentSnapshot() {
   };
 }
 
+// Canal en vivo disponible: primero la conexión directa (WebRTC), si no, el broker MQTT cifrado
+function liveChannel() {
+  if (syncLink && syncLink.connected && !syncLink.blocked) return syncLink;
+  if (mqttLink && mqttLink.state === 'peer') return mqttLink;
+  return null;
+}
+
 function broadcastTick(total, force) {
-  if (!syncLink || !syncLink.connected) return;
+  const channel = liveChannel();
+  if (!channel) return;
   const now = Date.now();
-  if (!force && now - lastTickSent < 900) return;
+  if (!force && now - lastTickSent < (channel === mqttLink ? 2000 : 900)) return;
   lastTickSent = now;
-  syncLink.send('tick', {
+  channel.send('tick', {
     rideId: state.rideId,
     status: state.status,
     distanceKm: state.totalDistanceKm,
@@ -1533,7 +1543,7 @@ function broadcastTick(total, force) {
 }
 
 function isLiveSynced() {
-  return !!(syncLink && syncLink.connected && !syncLink.blocked);
+  return !!liveChannel();
 }
 
 function isSynced() {
@@ -1690,7 +1700,9 @@ function initLinkListeners() {
   });
   LINK.btnDisconnect.addEventListener('click', () => {
     if (syncLink) syncLink.close();
-    offlineKey = null; window.TP.OfflinePair.clear();
+    offlineKey = null; offlineSecret = null; window.TP.OfflinePair.clear();
+    if (mqttLink) { mqttLink.stop(); mqttLink = null; }
+    setMqttStatus('');
     LINK.verifyBox.classList.add('hidden');
     LINK.mismatch.classList.add('hidden');
     LINK.step2.classList.add('hidden');
@@ -1734,6 +1746,8 @@ function initLinkListeners() {
       }
       window.TP.OfflinePair.save(r.secret);
       offlineKey = await window.TP.OfflinePair.keyFrom(r.secret);
+      offlineSecret = r.secret;
+      applyMqttSetting();
       if (r.replyCode) {
         await showOfflineCode(r.replyCode);
         offStatus(`Sincronizado ✅ (código de verificación ${r.verifyCode}, debe ser igual en el otro). Falta que el conductor escanee TU QR de arriba.`);
@@ -1755,7 +1769,7 @@ function initLinkListeners() {
       v.classList.add('hidden'); stopScan = null; document.getElementById('offlineIn').value = text; routeCode(text);
     }, () => { v.classList.add('hidden'); offStatus('No se pudo abrir la cámara; pega el código.'); });
   });
-  window.TP.OfflinePair.load().then((p) => { if (p) { offlineKey = p.key; refreshSyncUI(); } });
+  window.TP.OfflinePair.load().then((p) => { if (p) { offlineKey = p.key; offlineSecret = p.secret; refreshSyncUI(); applyMqttSetting(); } });
 
   // Flujo inverso: el conductor genera la invitación y el pasajero la escanea
   // Cualquier botón de escaneo/pegado acepta cualquier tipo de código y lo manda al flujo correcto
@@ -1873,11 +1887,53 @@ function initHistoryListeners() {
   window.addEventListener('pagehide', () => persistActiveRide(true));
 }
 
+// ==========================================
+// 15. SEGUIMIENTO EN VIVO POR MQTT CIFRADO (opcional, broker público como retransmisor)
+// ==========================================
+
+const MQTT_PREF = 'tp_mqtt_p';
+
+function setMqttStatus(t) { const el = document.getElementById('mqttStatus'); if (el) el.textContent = t; }
+
+function applyMqttSetting() {
+  const toggle = document.getElementById('toggleMqtt');
+  let enabled = false;
+  try { enabled = localStorage.getItem(MQTT_PREF) === '1'; } catch (e) { /* noop */ }
+  if (toggle) toggle.checked = enabled;
+  if (mqttLink) { mqttLink.stop(); mqttLink = null; }
+  if (!enabled) { setMqttStatus(''); refreshSyncUI(); return; }
+  if (!offlineSecret) { setMqttStatus('Primero sincroniza por QR (sección de arriba).'); return; }
+  mqttLink = new window.TP.MqttLink({
+    role: 'p',
+    secret: offlineSecret,
+    getIntegrity: () => ({ rootHash: integrityState.rootHash }),
+    onState: (st, detail) => {
+      const labels = { connecting: 'Conectando al broker…', broker: 'Conectado al broker; esperando al conductor…', peer: '✅ Conductor en línea (cifrado)', offline: '', error: '⚠️ Error: ' + (detail || '') };
+      setMqttStatus(labels[st] || st);
+      if (st === 'peer') broadcastTick(null, true);
+      refreshSyncUI();
+    },
+    onHello: (info) => { if (info.mismatch) setMqttStatus('⚠️ El conductor usa una versión distinta de la app.'); },
+    onMessage: () => { /* el pasajero solo emite */ }
+  });
+  mqttLink.start();
+}
+
+function initMqttListeners() {
+  const toggle = document.getElementById('toggleMqtt');
+  if (!toggle) return;
+  toggle.addEventListener('change', () => {
+    try { localStorage.setItem(MQTT_PREF, toggle.checked ? '1' : '0'); } catch (e) { /* noop */ }
+    applyMqttSetting();
+  });
+}
+
 // Inicialización cuando carga el documento
 document.addEventListener('DOMContentLoaded', () => {
   initEventListeners();
   initLinkListeners();
   initHistoryListeners();
+  initMqttListeners();
   runIntegrityCheck();
   initMapIfNeeded();
   updateDisplays();

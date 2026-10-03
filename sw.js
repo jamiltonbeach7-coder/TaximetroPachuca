@@ -12,6 +12,7 @@ const ASSETS_TO_CACHE = [
   './shared/integrity.js',
   './shared/sync.js',
   './shared/storage.js',
+  './shared/mqtt-sync.js',
   './conductor/',
   './conductor/index.html',
   './conductor/driver.js',
