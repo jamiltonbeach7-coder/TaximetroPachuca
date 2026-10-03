@@ -11,6 +11,7 @@ const ASSETS_TO_CACHE = [
   './shared/fare.js',
   './shared/integrity.js',
   './shared/sync.js',
+  './shared/storage.js',
   './conductor/',
   './conductor/index.html',
   './conductor/driver.js',

@@ -72,6 +72,7 @@ const state = {
   timerInterval: null,
   rideStartTime: null,
   rideEndTime: null,
+  rideId: null,
 
   // Hardware y Auxiliares
   wakeLock: null,
@@ -329,6 +330,7 @@ function updateDisplays() {
   DOM.auditTotalFare.textContent = calculation.total.toFixed(2);
 
   broadcastTick(calculation.total);
+  persistActiveRide();
 }
 
 function formatTime(totalSeconds) {
@@ -963,6 +965,13 @@ function startRide() {
 
   setVisualStatus('running', '🚕 Viaje en progreso');
 
+  state.rideId = Date.now();
+  ensureTimer();
+
+  updateDisplays();
+}
+
+function ensureTimer() {
   if (state.timerInterval) clearInterval(state.timerInterval);
   state.timerInterval = setInterval(() => {
     if (!state.isSimulating) {
@@ -973,8 +982,6 @@ function startRide() {
       updateDisplays();
     }
   }, 1000);
-
-  updateDisplays();
 }
 
 function togglePauseRide() {
@@ -989,6 +996,7 @@ function togglePauseRide() {
   } else if (state.status === 'PAUSED') {
     sounds.resumeSound();
     state.status = 'RUNNING';
+    if (!state.timerInterval) { ensureTimer(); requestWakeLock(); }
     DOM.pauseText.textContent = "PAUSAR";
     DOM.pauseIcon.textContent = "⏸️";
     DOM.btnPauseRide.classList.add('bg-amber-500', 'hover:bg-amber-400');
@@ -998,6 +1006,7 @@ function togglePauseRide() {
 }
 
 function finishRide() {
+  const wasSimulated = state.isSimulating;
   sounds.finishSound();
   releaseWakeLock();
 
@@ -1018,6 +1027,7 @@ function finishRide() {
 
   setVisualStatus('finished', '🏁 Viaje terminado');
   updateDisplays();
+  saveFinishedTrip(wasSimulated);
   broadcastTick(null, true);
   refreshSyncUI();
 
@@ -1041,6 +1051,8 @@ function resetRide() {
   state.routeCoordinates = [];
   state.rideStartTime = null;
   state.rideEndTime = null;
+  state.rideId = null;
+  window.TP.store.clearActive();
 
   if (mapRoutePolyline) {
     mapRoutePolyline.setLatLngs([]);
@@ -1494,7 +1506,7 @@ let stopScan = null;
 function currentSnapshot() {
   const total = window.TP.calculateFare(state.totalDistanceKm, state.totalWaitSeconds, state.tariff, state.nightFareActive, state.nightSurchargePct).total;
   return {
-    status: state.status, distanceKm: state.totalDistanceKm, waitSeconds: state.totalWaitSeconds,
+    rideId: state.rideId, status: state.status, distanceKm: state.totalDistanceKm, waitSeconds: state.totalWaitSeconds,
     elapsedSeconds: state.totalElapsedSeconds, speedKmh: 0, tariff: state.tariff, tariffKey: state.tariffKey,
     isNight: state.nightFareActive, nightPct: state.nightSurchargePct, total
   };
@@ -1506,6 +1518,7 @@ function broadcastTick(total, force) {
   if (!force && now - lastTickSent < 900) return;
   lastTickSent = now;
   syncLink.send('tick', {
+    rideId: state.rideId,
     status: state.status,
     distanceKm: state.totalDistanceKm,
     waitSeconds: state.totalWaitSeconds,
@@ -1785,11 +1798,88 @@ function initLinkListeners() {
   refreshSyncUI();
 }
 
+// ==========================================
+// 14. ALMACENAMIENTO LOCAL: VIAJE EN CURSO E HISTORIAL (solo en este dispositivo)
+// ==========================================
+
+let lastPersist = 0;
+
+function persistActiveRide(force) {
+  if (state.isSimulating || (state.status !== 'RUNNING' && state.status !== 'PAUSED')) return;
+  const now = Date.now();
+  if (!force && now - lastPersist < 5000) return;
+  lastPersist = now;
+  window.TP.store.saveActive({
+    rideId: state.rideId, status: state.status, tariffKey: state.tariffKey, tariff: state.tariff,
+    nightFareActive: state.nightFareActive, distanceKm: state.totalDistanceKm,
+    elapsedSeconds: state.totalElapsedSeconds, waitSeconds: state.totalWaitSeconds,
+    startTime: state.rideStartTime ? state.rideStartTime.getTime() : null, savedAt: now
+  });
+}
+
+function saveFinishedTrip(wasSimulated) {
+  window.TP.store.clearActive();
+  if (wasSimulated) return; // las simulaciones no se guardan
+  const calc = calculateFare(state.totalDistanceKm, state.totalWaitSeconds, state.tariff, state.nightFareActive);
+  window.TP.store.addTrip({
+    id: state.rideId || Date.now(), ts: state.rideStartTime ? state.rideStartTime.getTime() : Date.now(),
+    distanceKm: state.totalDistanceKm, elapsedSeconds: state.totalElapsedSeconds, waitSeconds: state.totalWaitSeconds,
+    tariffName: state.tariff.shortName, total: calc.total, isNight: state.nightFareActive
+  });
+}
+
+// Recupera un viaje que se interrumpió (app cerrada o recargada): queda en pausa para reanudarlo
+function restoreActiveRide() {
+  const saved = window.TP.store.loadActive();
+  if (!saved || state.status !== 'IDLE') return;
+  state.tariffKey = saved.tariffKey || state.tariffKey;
+  state.tariff = saved.tariff || state.tariff;
+  state.nightFareActive = !!saved.nightFareActive;
+  state.totalDistanceKm = Number(saved.distanceKm) || 0;
+  state.totalElapsedSeconds = Number(saved.elapsedSeconds) || 0;
+  state.totalWaitSeconds = Number(saved.waitSeconds) || 0;
+  state.rideStartTime = saved.startTime ? new Date(saved.startTime) : new Date();
+  state.rideId = saved.rideId || Date.now();
+  state.status = 'PAUSED';
+  state.currentSpeedKmh = 0;
+  DOM.activeTariffLabel.textContent = `${state.tariff.shortName} ${state.nightFareActive ? '🌙 (Nocturna +20%)' : ''}`;
+  DOM.btnStartRide.classList.add('hidden');
+  DOM.btnPauseRide.classList.remove('hidden');
+  DOM.btnFinishRide.classList.remove('hidden');
+  DOM.btnResetRide.classList.add('hidden');
+  DOM.pauseText.textContent = "REANUDAR";
+  DOM.pauseIcon.textContent = "▶️";
+  DOM.btnPauseRide.classList.remove('bg-amber-500', 'hover:bg-amber-400');
+  DOM.btnPauseRide.classList.add('bg-emerald-500', 'hover:bg-emerald-400');
+  setVisualStatus('paused', '⏸️ Viaje recuperado: toca REANUDAR para continuar');
+  updateDisplays();
+}
+
+function initHistoryListeners() {
+  const modal = document.getElementById('historyModal');
+  const list = document.getElementById('historyList');
+  const summary = document.getElementById('historySummary');
+  const refresh = () => window.TP.store.render(list, summary);
+  document.getElementById('btnOpenHistory').addEventListener('click', () => { refresh(); modal.classList.remove('hidden'); });
+  document.getElementById('btnCloseHistory').addEventListener('click', () => modal.classList.add('hidden'));
+  document.getElementById('btnExportHistory').addEventListener('click', () => {
+    window.TP.store.download('viajes-pasajero.json', window.TP.store.exportJson());
+  });
+  document.getElementById('btnClearHistory').addEventListener('click', () => {
+    if (confirm('¿Borrar todo el historial de este dispositivo? No se puede deshacer.')) { window.TP.store.clearHistory(); refresh(); }
+  });
+  // Guardar el viaje en curso al ocultar o cerrar la app
+  document.addEventListener('visibilitychange', () => { if (document.hidden) persistActiveRide(true); });
+  window.addEventListener('pagehide', () => persistActiveRide(true));
+}
+
 // Inicialización cuando carga el documento
 document.addEventListener('DOMContentLoaded', () => {
   initEventListeners();
   initLinkListeners();
+  initHistoryListeners();
   runIntegrityCheck();
   initMapIfNeeded();
   updateDisplays();
+  restoreActiveRide();
 });

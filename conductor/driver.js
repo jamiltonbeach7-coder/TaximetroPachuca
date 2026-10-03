@@ -35,7 +35,17 @@ async function runIntegrityCheck() {
   }
 }
 
-function renderTick(d) {
+function saveTrip(d, calc, source) {
+  if (!d || !d.rideId) return;
+  TP.store.addTrip({
+    id: d.rideId, ts: d.rideId, distanceKm: Number(d.distanceKm) || 0, elapsedSeconds: Number(d.elapsedSeconds) || 0,
+    waitSeconds: Number(d.waitSeconds) || 0, tariffName: (TP.TARIFF_PRESETS[d.tariffKey] || {}).shortName || 'Personalizada',
+    total: calc.total, isNight: !!d.isNight, source
+  });
+  TP.store.render($('historyList'), $('historySummary'));
+}
+
+function renderTick(d, source) {
   // Validar tipos antes de usar datos remotos
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
   const tariff = {
@@ -70,6 +80,7 @@ function renderTick(d) {
 
   const diff = Math.abs(calc.total - num(d.total));
   lastTotalOk = diff <= 0.01;
+  if (d.status === 'FINISHED') saveTrip(d, calc, source || 'en vivo');
   const chk = $('fareCheck');
   chk.textContent = lastTotalOk ? '✅ Total coincide con el del pasajero' : `⚠️ El pasajero reporta $${num(d.total).toFixed(2)} (difiere $${diff.toFixed(2)})`;
   chk.className = 'text-xs mt-2 ' + (lastTotalOk ? 'text-emerald-400' : 'text-red-400 font-bold');
@@ -144,7 +155,8 @@ async function loadSnapshot(code) {
   const st = $('snapStatus');
   try {
     const snap = await TP.Snapshot.decode(code, offlineKey);
-    renderTick(snap.data);
+    const src = snap.authentic === true ? 'QR firmado' : snap.authentic === false ? 'QR firma inválida' : 'QR sin firma';
+    renderTick(Object.assign({}, snap.data, { status: 'FINISHED' }), src);
     const sameApp = snap.rootHash && snap.rootHash === integrityState.rootHash;
     const age = Math.round((Date.now() - snap.ts) / 60000);
     const sig = snap.authentic === true ? '🔏 firma válida (del pasajero sincronizado)'
@@ -250,6 +262,14 @@ $('btnOfflineScan').addEventListener('click', async () => {
 TP.OfflinePair.load().then((p) => { if (p) { offlineKey = p.key; $('connBadge').textContent = '🔑 Sincronizado (QR)'; showSyncedHome(); } });
 
 $('integrityBadge').addEventListener('click', () => alert(integrityState.report || 'Verificando…'));
+// ---- Historial local ----
+const refreshHistory = () => TP.store.render($('historyList'), $('historySummary'));
+$('btnExportHistory').addEventListener('click', () => TP.store.download('viajes-conductor.json', TP.store.exportJson()));
+$('btnClearHistory').addEventListener('click', () => {
+  if (confirm('¿Borrar todo el historial de este dispositivo? No se puede deshacer.')) { TP.store.clearHistory(); refreshHistory(); }
+});
+refreshHistory();
+
 runIntegrityCheck();
 
 if ('serviceWorker' in navigator) {
