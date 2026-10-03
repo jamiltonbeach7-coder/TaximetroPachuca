@@ -8,6 +8,8 @@ const integrityState = { ok: false, rootHash: '' };
 let sync = null;
 let stopScan = null;
 let lastTotalOk = true;
+let offlineKey = null;
+let offlinePair = null;
 
 function formatTime(totalSeconds) {
   const s = Math.floor(Math.max(0, Number(totalSeconds) || 0));
@@ -84,7 +86,8 @@ function createSync() {
         $('pairSection').classList.add('hidden');
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
-      if (st === 'timeout') $('pairStatus').textContent = 'No se logró conectar (¿redes distintas?). Prueba la misma Wi-Fi o usa el Plan B de abajo.';
+      if (sync) $('linkDiag').textContent = sync.getDiagnostics();
+      if (st === 'timeout') $('pairStatus').textContent = 'No se logró conectar (¿redes distintas?). Prueba la misma Wi-Fi o sincroniza solo por QR (abajo).';
       if (st === 'disconnected') $('pairSection').classList.remove('hidden');
       if (st === 'disconnected') $('pairStatus').textContent = 'Conexión perdida. Pide al pasajero una nueva invitación.';
     },
@@ -110,7 +113,7 @@ async function acceptOffer(code) {
     $('answerCode').value = answer;
     $('answerBox').classList.remove('hidden');
     try { await TP.qr.render($('answerQr'), answer); } catch (e) { $('answerQr').classList.add('hidden'); }
-    $('pairStatus').textContent = 'Muestra el QR de respuesta al pasajero.';
+    $('pairStatus').textContent = 'Paso 2 de 3 listo: el pasajero debe escanear este QR de respuesta. Espera a que diga Conectado.';
   } catch (e) {
     $('pairStatus').textContent = 'Código inválido: ' + e.message;
   }
@@ -128,12 +131,15 @@ $('btnCopyAnswer').addEventListener('click', () => { navigator.clipboard && navi
 async function loadSnapshot(code) {
   const st = $('snapStatus');
   try {
-    const snap = await TP.Snapshot.decode(code);
+    const snap = await TP.Snapshot.decode(code, offlineKey);
     renderTick(snap.data);
     const sameApp = snap.rootHash && snap.rootHash === integrityState.rootHash;
     const age = Math.round((Date.now() - snap.ts) / 60000);
-    st.textContent = `Resumen cargado (generado hace ${age} min). App del pasajero: ${sameApp ? '✅ misma versión' : '⚠️ versión distinta'}. Sin conexión no se puede autenticar al emisor: confía en el total recalculado.`;
-    st.className = 'text-xs ' + (sameApp ? 'text-emerald-400' : 'text-amber-400');
+    const sig = snap.authentic === true ? '🔏 firma válida (del pasajero sincronizado)'
+      : snap.authentic === false ? '⛔ FIRMA INVÁLIDA o ausente: no confíes en este resumen'
+      : 'sin firma verificable (no están sincronizados por QR); confía en el total recalculado';
+    st.textContent = `Resumen cargado (hace ${age} min). ${sig}. App del pasajero: ${sameApp ? '✅ misma versión' : '⚠️ versión distinta'}.`;
+    st.className = 'text-xs ' + (snap.authentic === false ? 'text-red-400 font-bold' : sameApp ? 'text-emerald-400' : 'text-amber-400');
   } catch (e) {
     st.textContent = 'No se pudo leer: ' + e.message;
     st.className = 'text-xs text-red-400';
@@ -157,12 +163,12 @@ $('btnGenInvite').addEventListener('click', async () => {
     $('inviteCode').value = code;
     $('inviteBox').classList.remove('hidden');
     try { await TP.qr.render($('inviteQr'), code); } catch (e) { $('inviteQr').classList.add('hidden'); }
-    $('pairStatus').textContent = 'Muestra este QR al pasajero.';
+    $('pairStatus').textContent = 'Paso 1 de 3 listo: el pasajero debe escanear este QR. Después escanea SU respuesta (paso 2) y toca Conectar (paso 3).';
   } catch (e) { $('pairStatus').textContent = 'Error: ' + e.message; }
 });
 $('btnCopyInvite').addEventListener('click', () => { navigator.clipboard && navigator.clipboard.writeText($('inviteCode').value); });
 async function applyAnswer(code) {
-  try { await sync.acceptAnswer(code); $('pairStatus').textContent = 'Conectando…'; }
+  try { await sync.acceptAnswer(code); $('pairStatus').textContent = 'Paso 3 de 3: conectando…'; const iv = setInterval(() => { if (!sync || sync.connected) return clearInterval(iv); $('linkDiag').textContent = sync.getDiagnostics(); }, 1500); setTimeout(() => clearInterval(iv), 30000); }
   catch (e) { $('pairStatus').textContent = 'Código inválido: ' + e.message; }
 }
 $('btnApplyAns').addEventListener('click', () => applyAnswer($('ansIn').value));
@@ -172,6 +178,49 @@ $('btnScanAnswer').addEventListener('click', async () => {
     $('scanAnsVideo').classList.add('hidden'); applyAnswer(text);
   }, () => { $('scanAnsVideo').classList.add('hidden'); $('pairStatus').textContent = 'No se pudo abrir la cámara; pega el código.'; });
 });
+
+// ---- Sincronización solo por QR (clave compartida ECDH) ----
+const offStatus = (t) => { $('offlineStatus').textContent = t; };
+async function showOfflineCode(code) {
+  $('offlineCode').value = code;
+  $('offlineCode').classList.remove('hidden');
+  $('offlineQr').classList.remove('hidden');
+  try { await TP.qr.render($('offlineQr'), code); } catch (e) { $('offlineQr').classList.add('hidden'); }
+}
+$('btnOfflineStart').addEventListener('click', async () => {
+  try {
+    offlinePair = new TP.OfflinePair();
+    await showOfflineCode(await offlinePair.start(integrityState.rootHash));
+    offStatus('Paso 1 listo: el pasajero debe escanear este QR. Después escanea el QR que él te muestre.');
+  } catch (e) { offStatus('Error: ' + e.message); }
+});
+async function applyOffline(code) {
+  try {
+    if (!offlinePair) offlinePair = new TP.OfflinePair();
+    const r = await offlinePair.accept(code, integrityState.rootHash);
+    if (r.mismatch && !confirm('La app del pasajero tiene una versión distinta (hash diferente). ¿Sincronizar de todos modos?')) {
+      offStatus('Sincronización cancelada: versiones distintas.'); offlinePair = null; return;
+    }
+    TP.OfflinePair.save(r.secret);
+    offlineKey = await TP.OfflinePair.keyFrom(r.secret);
+    $('connBadge').textContent = '🔑 Sincronizado (QR)';
+    if (r.replyCode) {
+      await showOfflineCode(r.replyCode);
+      offStatus(`Sincronizado ✅ (código de verificación ${r.verifyCode}, debe ser igual en el otro). Falta que el pasajero escanee TU QR de arriba.`);
+    } else {
+      offStatus(`Sincronizado ✅ (código de verificación ${r.verifyCode}, debe ser igual en el otro). Al terminar el viaje escanea su resumen firmado.`);
+    }
+    offlinePair = null;
+  } catch (e) { offStatus('No se pudo sincronizar: ' + e.message); }
+}
+$('btnOfflineApply').addEventListener('click', () => applyOffline($('offlineIn').value));
+$('btnOfflineScan').addEventListener('click', async () => {
+  $('offlineVideo').classList.remove('hidden');
+  await TP.qr.scan($('offlineVideo'), (text) => {
+    $('offlineVideo').classList.add('hidden'); $('offlineIn').value = text; applyOffline(text);
+  }, () => { $('offlineVideo').classList.add('hidden'); offStatus('No se pudo abrir la cámara; pega el código.'); });
+});
+TP.OfflinePair.load().then((p) => { if (p) { offlineKey = p.key; $('connBadge').textContent = '🔑 Sincronizado (QR)'; } });
 
 runIntegrityCheck();
 

@@ -515,6 +515,7 @@
         <button id="btnCloseLinkModal" class="text-slate-400 hover:text-white text-xl font-bold">✕</button>
       </div>
       <p id="linkStatus" class="text-sm text-slate-300">Sin vincular.</p>
+      <p id="linkDiag" class="text-[10px] font-mono text-slate-500"></p>
 
       <div id="linkStep1" class="space-y-2">
         <button id="btnGenerateInvite" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-xl">1. Generar invitación (QR)</button>
@@ -554,6 +555,19 @@
         <p>⚠️ La app del conductor no coincide con la tuya (hash distinto o no verificado). Por seguridad no se envían datos del viaje.</p>
         <button id="btnForceLink" class="bg-red-500 hover:bg-red-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Enviar de todos modos</button>
       </div>
+      <div class="border-t border-slate-700 pt-3 space-y-2">
+        <h4 class="text-sm font-bold text-amber-400">Sincronizar solo por QR (sin conexión en vivo)</h4>
+        <p class="text-xs text-slate-400">Funciona siempre, aunque estén en redes distintas. Permite iniciar viajes y al final enviar un resumen firmado al conductor.</p>
+        <button id="btnOfflineStart" class="w-full bg-slate-800 border border-slate-700 text-slate-100 font-semibold py-2 rounded-xl">1. Generar mi código (QR corto)</button>
+        <div id="offlineQr" class="hidden bg-white rounded-xl p-2"></div>
+        <textarea id="offlineCode" readonly rows="2" class="hidden w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[10px] font-mono text-slate-300"></textarea>
+        <video id="offlineVideo" class="hidden w-full rounded-xl bg-black" playsinline muted></video>
+        <button id="btnOfflineScan" class="w-full bg-slate-800 border border-slate-700 text-slate-100 font-semibold py-2 rounded-xl">2. 📷 Escanear el código del otro</button>
+        <textarea id="offlineIn" rows="2" placeholder="…o pega el código del otro (TPK1.…)" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-[10px] font-mono text-slate-200"></textarea>
+        <button id="btnOfflineApply" class="w-full bg-slate-800 border border-slate-700 text-slate-100 font-semibold py-2 rounded-xl">Sincronizar</button>
+        <p id="offlineStatus" class="text-xs text-slate-300"></p>
+      </div>
+
       <div class="border-t border-slate-700 pt-3 space-y-2">
         <h4 class="text-sm font-bold text-amber-400">Plan B: sin conexión</h4>
         <p class="text-xs text-slate-400">Si el emparejamiento falla (redes distintas), genera un código/QR del viaje actual y pásalo al conductor.</p>

@@ -1019,6 +1019,7 @@ function finishRide() {
   setVisualStatus('finished', '🏁 Viaje terminado');
   updateDisplays();
   broadcastTick(null, true);
+  refreshSyncUI();
 
   showTicketModal();
 }
@@ -1055,6 +1056,7 @@ function resetRide() {
   setVisualStatus('idle', 'Listo para iniciar');
   updateDisplays();
   broadcastTick(null, true);
+  refreshSyncUI();
 }
 
 function setVisualStatus(type, label) {
@@ -1469,6 +1471,8 @@ function initEventListeners() {
 
 const integrityState = { ok: false, rootHash: '', done: false };
 let syncLink = null;
+let offlineKey = null;       // clave HMAC del emparejamiento solo-QR (persistida en este dispositivo)
+let offlinePair = null;      // acuerdo de clave en curso
 let lastTickSent = 0;
 const LINK = {
   modal: document.getElementById('linkModal'),
@@ -1515,8 +1519,12 @@ function broadcastTick(total, force) {
   });
 }
 
-function isSynced() {
+function isLiveSynced() {
   return !!(syncLink && syncLink.connected && !syncLink.blocked);
+}
+
+function isSynced() {
+  return isLiveSynced() || !!offlineKey;
 }
 
 function refreshSyncUI() {
@@ -1525,11 +1533,18 @@ function refreshSyncUI() {
   const btn = document.getElementById('btnSyncBanner');
   if (!banner) return;
   const synced = isSynced();
+  const finishedOffline = synced && !isLiveSynced() && state.status === 'FINISHED';
   banner.className = 'rounded-2xl border px-4 py-3 flex items-center justify-between gap-3 ' +
     (synced ? 'bg-emerald-900/30 border-emerald-500/60 text-emerald-200' : 'bg-red-900/30 border-red-500/60 text-red-200');
-  text.textContent = synced ? '✅ Sincronizado con el conductor. Ya puedes iniciar el viaje.' : '⚠️ Sin sincronizar con el conductor. Vincula para poder iniciar el viaje.';
-  btn.classList.toggle('hidden', synced);
+  text.textContent = finishedOffline
+    ? '🧾 Viaje terminado: muestra el resumen firmado al conductor.'
+    : synced
+      ? (isLiveSynced() ? '✅ Sincronizado en vivo con el conductor.' : '✅ Sincronizado por QR con el conductor. Ya puedes iniciar el viaje.')
+      : '⚠️ Sin sincronizar con el conductor. Vincula para poder iniciar el viaje.';
+  btn.textContent = finishedOffline ? '🧾 Enviar resumen' : '🔗 Vincular';
+  btn.classList.toggle('hidden', synced && !finishedOffline);
   if (DOM.btnStartRide) DOM.btnStartRide.classList.toggle('opacity-50', !synced);
+  if (offlineKey) LINK.btnDisconnect.classList.remove('hidden');
 }
 
 // Devuelve true si se puede iniciar; si no, abre la ventana de vinculación
@@ -1538,6 +1553,15 @@ function requireSync() {
   LINK.modal.classList.remove('hidden');
   setLinkStatus('Primero sincroniza con el conductor para iniciar el viaje.');
   return false;
+}
+
+function showLinkDiag(st) {
+  const el = document.getElementById('linkDiag');
+  if (!el || !syncLink) return;
+  const tip = st === 'timeout'
+    ? ' · Sugerencia: usen la misma Wi-Fi o sincronicen solo por QR (más abajo).'
+    : '';
+  el.textContent = syncLink.getDiagnostics() + tip;
 }
 
 function setLinkStatus(text) { if (LINK.status) LINK.status.textContent = text; }
@@ -1566,6 +1590,7 @@ function createSyncLink() {
     onState: (st) => {
       const labels = { idle: 'Sin vincular.', pairing: 'Emparejando…', connected: '✅ Conectado con el conductor', disconnected: '⚠️ Conexión perdida. Vuelve a vincular.', timeout: '⏱️ No se logró conectar (¿redes distintas?). Usa la misma Wi-Fi o el Plan B sin conexión.', error: '⚠️ Mensaje rechazado (firma inválida).' };
       setLinkStatus(labels[st] || st);
+      showLinkDiag(st);
       LINK.btnDisconnect.classList.toggle('hidden', st === 'idle');
       if (st === 'connected') {
         LINK.step2.classList.add('hidden');
@@ -1607,7 +1632,7 @@ function initLinkListeners() {
       LINK.step2.classList.remove('hidden');
       try { await window.TP.qr.render(LINK.inviteQr, code); }
       catch (e) { LINK.inviteQr.classList.add('hidden'); /* sin internet: queda el código de texto */ }
-      setLinkStatus('Muestra este QR al conductor.');
+      setLinkStatus('Paso 1 de 3 listo: el conductor debe escanear este QR. Después escanea SU respuesta (paso 2) y toca Conectar (paso 3).');
     } catch (e) { setLinkStatus('Error: ' + e.message); }
   });
 
@@ -1616,7 +1641,7 @@ function initLinkListeners() {
   });
 
   async function applyAnswer(code) {
-    try { await syncLink.acceptAnswer(code); setLinkStatus('Conectando…'); }
+    try { await syncLink.acceptAnswer(code); setLinkStatus('Paso 3 de 3: conectando…'); const iv = setInterval(() => { if (!syncLink || syncLink.connected) return clearInterval(iv); showLinkDiag('pairing'); }, 1500); setTimeout(() => clearInterval(iv), 30000); }
     catch (e) { setLinkStatus('Código inválido: ' + e.message); }
   }
   document.getElementById('btnApplyAnswer').addEventListener('click', () => applyAnswer(LINK.answer.value));
@@ -1628,7 +1653,7 @@ function initLinkListeners() {
   });
 
   document.getElementById('btnSnapshot').addEventListener('click', async () => {
-    const code = await window.TP.Snapshot.encode(currentSnapshot(), integrityState.rootHash);
+    const code = await window.TP.Snapshot.encode(currentSnapshot(), integrityState.rootHash, offlineKey);
     const ta = document.getElementById('snapshotCode');
     const qr = document.getElementById('snapshotQr');
     ta.value = code;
@@ -1650,13 +1675,63 @@ function initLinkListeners() {
   });
   LINK.btnDisconnect.addEventListener('click', () => {
     if (syncLink) syncLink.close();
+    offlineKey = null; window.TP.OfflinePair.clear();
     LINK.verifyBox.classList.add('hidden');
     LINK.mismatch.classList.add('hidden');
     LINK.step2.classList.add('hidden');
     refreshSyncUI();
   });
 
-  document.getElementById('btnSyncBanner').addEventListener('click', () => LINK.modal.classList.remove('hidden'));
+  document.getElementById('btnSyncBanner').addEventListener('click', () => {
+    LINK.modal.classList.remove('hidden');
+    if (isSynced() && !isLiveSynced() && state.status === 'FINISHED') document.getElementById('btnSnapshot').click();
+  });
+
+  // ---- Sincronización solo por QR (clave compartida ECDH) ----
+  const offStatus = (t) => { document.getElementById('offlineStatus').textContent = t; };
+  async function showOfflineCode(code) {
+    document.getElementById('offlineCode').value = code;
+    document.getElementById('offlineCode').classList.remove('hidden');
+    const qr = document.getElementById('offlineQr');
+    qr.classList.remove('hidden');
+    try { await window.TP.qr.render(qr, code); } catch (e) { qr.classList.add('hidden'); }
+  }
+  document.getElementById('btnOfflineStart').addEventListener('click', async () => {
+    try {
+      offlinePair = new window.TP.OfflinePair();
+      await showOfflineCode(await offlinePair.start(integrityState.rootHash));
+      offStatus('Paso 1 listo: el conductor debe escanear este QR. Después escanea el QR que él te muestre.');
+    } catch (e) { offStatus('Error: ' + e.message); }
+  });
+  async function applyOffline(code) {
+    try {
+      if (!offlinePair) offlinePair = new window.TP.OfflinePair();
+      const r = await offlinePair.accept(code, integrityState.rootHash);
+      if (r.mismatch && !confirm('La app del conductor tiene una versión distinta (hash diferente). ¿Sincronizar de todos modos?')) {
+        offStatus('Sincronización cancelada: versiones distintas.'); offlinePair = null; return;
+      }
+      window.TP.OfflinePair.save(r.secret);
+      offlineKey = await window.TP.OfflinePair.keyFrom(r.secret);
+      if (r.replyCode) {
+        await showOfflineCode(r.replyCode);
+        offStatus(`Sincronizado ✅ (código de verificación ${r.verifyCode}, debe ser igual en el otro). Falta que el conductor escanee TU QR de arriba.`);
+      } else {
+        offStatus(`Sincronizado ✅ (código de verificación ${r.verifyCode}, debe ser igual en el otro).`);
+      }
+      refreshSyncUI();
+      setTimeout(() => { if (!r.replyCode) { LINK.modal.classList.add('hidden'); window.scrollTo({ top: 0, behavior: 'smooth' }); } }, 1500);
+      offlinePair = null;
+    } catch (e) { offStatus('No se pudo sincronizar: ' + e.message); }
+  }
+  document.getElementById('btnOfflineApply').addEventListener('click', () => applyOffline(document.getElementById('offlineIn').value));
+  document.getElementById('btnOfflineScan').addEventListener('click', async () => {
+    const v = document.getElementById('offlineVideo');
+    v.classList.remove('hidden');
+    stopScan = await window.TP.qr.scan(v, (text) => {
+      v.classList.add('hidden'); stopScan = null; document.getElementById('offlineIn').value = text; applyOffline(text);
+    }, () => { v.classList.add('hidden'); offStatus('No se pudo abrir la cámara; pega el código.'); });
+  });
+  window.TP.OfflinePair.load().then((p) => { if (p) { offlineKey = p.key; refreshSyncUI(); } });
 
   // Flujo inverso: el conductor genera la invitación y el pasajero la escanea
   async function acceptDriverOffer(code) {
@@ -1669,7 +1744,9 @@ function initLinkListeners() {
       document.getElementById('answerBox').classList.remove('hidden');
       try { await window.TP.qr.render(document.getElementById('answerQr'), answer); }
       catch (e) { document.getElementById('answerQr').classList.add('hidden'); }
-      setLinkStatus('Muestra el QR de respuesta al conductor.');
+      setLinkStatus('Paso 2 de 3 listo: el conductor debe escanear este QR de respuesta. Espera a que aparezca "Conectado".');
+      const iv = setInterval(() => { if (!syncLink || syncLink.connected) return clearInterval(iv); showLinkDiag('pairing'); }, 1500);
+      setTimeout(() => clearInterval(iv), 60000);
     } catch (e) { setLinkStatus('Invitación inválida: ' + e.message); }
   }
   document.getElementById('btnAcceptOffer').addEventListener('click', () => acceptDriverOffer(document.getElementById('offerCode').value));

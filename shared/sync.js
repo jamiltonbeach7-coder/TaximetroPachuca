@@ -25,17 +25,49 @@
     const out = new Blob([bytes]).stream().pipeThrough(stream);
     return new Uint8Array(await new Response(out).arrayBuffer());
   }
+  // SDP compacto: solo ufrag, pwd, huella, rol y hasta 4 candidatos UDP IPv4 (QR mucho más corto).
+  function compactDesc(desc) {
+    const sdp = desc.sdp;
+    const g = (re) => { const m = sdp.match(re); return m ? m[1].trim() : null; };
+    const u = g(/a=ice-ufrag:(.+)/), p = g(/a=ice-pwd:(.+)/), f = g(/a=fingerprint:sha-256 (.+)/), st = g(/a=setup:(.+)/);
+    if (!u || !p || !f || !st || !/m=application/.test(sdp)) return null;
+    const all = [...sdp.matchAll(/a=candidate:(.+)/g)].map(m => m[1].trim())
+      .filter(c => / udp /i.test(c) && !(c.split(' ')[4] || ':').includes(':'));
+    const srflx = all.filter(c => / typ srflx/.test(c)).slice(0, 2);
+    const host = all.filter(c => / typ host/.test(c)).slice(0, 2);
+    const fpBytes = f.split(':').map(h => parseInt(h, 16));
+    return { t: desc.type, u, p, f: toB64Url(Uint8Array.from(fpBytes)), s: st, c: [...host, ...srflx] };
+  }
+  function expandDesc(o) {
+    const fp = Array.from(fromB64Url(o.f)).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(':');
+    const lines = ['v=0', 'o=- 1 2 IN IP4 127.0.0.1', 's=-', 't=0 0', 'a=group:BUNDLE 0', 'a=msid-semantic: WMS',
+      'm=application 9 UDP/DTLS/SCTP webrtc-datachannel', 'c=IN IP4 0.0.0.0',
+      'a=ice-ufrag:' + o.u, 'a=ice-pwd:' + o.p, 'a=ice-options:trickle', 'a=fingerprint:sha-256 ' + fp,
+      'a=setup:' + o.s, 'a=mid:0', 'a=sctp-port:5000', 'a=max-message-size:262144',
+      ...o.c.map(c => 'a=candidate:' + c), 'a=end-of-candidates'];
+    return { type: o.t, sdp: lines.join('\r\n') + '\r\n' };
+  }
   async function encodeDesc(desc) {
-    const raw = enc.encode(JSON.stringify({ t: desc.type, s: desc.sdp }));
-    if (typeof CompressionStream === 'function') {
-      return 'TP1.' + toB64Url(await pipe(raw, new CompressionStream('deflate-raw')));
+    const compact = compactDesc(desc);
+    const hasDeflate = typeof CompressionStream === 'function';
+    if (compact) {
+      const raw = enc.encode(JSON.stringify(compact));
+      return 'TP2.' + toB64Url(hasDeflate ? await pipe(raw, new CompressionStream('deflate-raw')) : raw) + (hasDeflate ? '' : '~');
     }
-    return 'TP0.' + toB64Url(raw);
+    const raw = enc.encode(JSON.stringify({ t: desc.type, s: desc.sdp }));
+    return hasDeflate ? 'TP1.' + toB64Url(await pipe(raw, new CompressionStream('deflate-raw'))) : 'TP0.' + toB64Url(raw);
   }
   async function decodeDesc(code) {
     code = String(code || '').trim();
-    const [prefix, body] = [code.slice(0, 4), code.slice(4)];
+    const prefix = code.slice(0, 4);
+    let body = code.slice(4);
     let raw;
+    if (prefix === 'TP2.') {
+      const plain = body.endsWith('~');
+      if (plain) body = body.slice(0, -1);
+      raw = plain ? fromB64Url(body) : await pipe(fromB64Url(body), new DecompressionStream('deflate-raw'));
+      return expandDesc(JSON.parse(dec.decode(raw)));
+    }
     if (prefix === 'TP1.') raw = await pipe(fromB64Url(body), new DecompressionStream('deflate-raw'));
     else if (prefix === 'TP0.') raw = fromB64Url(body);
     else throw new Error('Código de emparejamiento inválido');
@@ -96,6 +128,14 @@
       this.lastRecvSeq = 0;
       this.blocked = false;
       this.opts.onState('pairing');
+      this.diag = { host: 0, srflx: 0, relay: 0, mdns: 0, remote: 0 };
+      this.pc.addEventListener('icecandidate', (ev) => {
+        if (!ev.candidate) return;
+        const c = ev.candidate.candidate || '';
+        const m = c.match(/ typ (\w+)/);
+        if (m && this.diag[m[1]] !== undefined) this.diag[m[1]]++;
+        if (/\.local /.test(c)) this.diag.mdns++;
+      });
       this.pc.addEventListener('connectionstatechange', () => {
         const s = this.pc && this.pc.connectionState;
         if (s === 'failed' || s === 'disconnected' || s === 'closed') {
@@ -154,6 +194,14 @@
       await this._deriveKey(this._offerCode, answerCode.trim());
       await this.pc.setRemoteDescription(await decodeDesc(answerCode));
       this._watchTimeout();
+    }
+
+    /** Resumen legible del estado de la conexión para mostrar al usuario. */
+    getDiagnostics() {
+      if (!this.pc) return '';
+      const d = this.diag || {};
+      const remote = ((this.pc.remoteDescription && this.pc.remoteDescription.sdp) || '').split('a=candidate:').length - 1;
+      return `Rutas propias: ${d.host || 0} locales${d.mdns ? ' (ocultas mDNS)' : ''}, ${d.srflx || 0} públicas · rutas del otro: ${remote} · ICE: ${this.pc.iceConnectionState} · conexión: ${this.pc.connectionState}`;
     }
 
     /** Si no se conecta a tiempo (p. ej. redes distintas), avisa para ofrecer el modo sin conexión. */
@@ -284,8 +332,10 @@
   // Código = "TPR1." + deflate(JSON) en base64url + "." + 8 hex de SHA-256 (detecta errores de copiado/alteración).
   // Sin clave compartida NO autentica al emisor: el conductor debe recalcular y comparar el total.
   const Snapshot = {
-    async encode(data, rootHash) {
-      const raw = enc.encode(JSON.stringify({ d: data, h: rootHash || '', ts: Date.now() }));
+    async encode(data, rootHash, key) {
+      const payload = { d: data, h: rootHash || '', ts: Date.now() };
+      if (key) payload.m = await hmacHex(key, payload.ts + '|' + JSON.stringify(payload.d) + '|' + payload.h);
+      const raw = enc.encode(JSON.stringify(payload));
       const body = typeof CompressionStream === 'function'
         ? 'TPR1.' + toB64Url(await pipe(raw, new CompressionStream('deflate-raw')))
         : 'TPR0.' + toB64Url(raw);
@@ -293,7 +343,8 @@
       const hex = Array.from(sum.slice(0, 4)).map(b => b.toString(16).padStart(2, '0')).join('');
       return body + '.' + hex;
     },
-    async decode(code) {
+    /** authentic: true (firma válida), false (firma inválida o falta), null (sin clave local para comprobar) */
+    async decode(code, key) {
       code = String(code || '').trim();
       const dot = code.lastIndexOf('.');
       const body = code.slice(0, dot), hex = code.slice(dot + 1);
@@ -303,12 +354,71 @@
       const bytes = fromB64Url(body.slice(5));
       const raw = body.startsWith('TPR1.') ? await pipe(bytes, new DecompressionStream('deflate-raw')) : bytes;
       const o = JSON.parse(dec.decode(raw));
-      return { data: o.d, rootHash: o.h, ts: o.ts };
+      let authentic = null;
+      if (key) {
+        authentic = !!o.m && sameHex(await hmacHex(key, o.ts + '|' + JSON.stringify(o.d) + '|' + o.h), String(o.m));
+      }
+      return { data: o.d, rootHash: o.h, ts: o.ts, signed: !!o.m, authentic };
     }
   };
+
+  // ---------- Sincronización solo por QR (sin WebRTC): acuerdo de clave ECDH P-256 ----------
+  // Código = "TPK1." + llave pública (b64url) + "." + 16 hex del hash raíz de la app.
+  // Tras intercambiar los dos códigos ambos tienen la misma clave HMAC (se guarda en este dispositivo).
+  const STORE_KEY = 'tp_offline_pair' + (location.pathname.indexOf('/conductor') !== -1 ? '_d' : '_p'); // una clave por app
+  class OfflinePair {
+    constructor() { this.keyPair = null; this.myPub = null; this.myCode = null; }
+
+    async _ensureKeys(rootHash) {
+      if (this.keyPair) return false;
+      this.keyPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']);
+      // La llave privada no es exportable, la pública sí
+      const raw = new Uint8Array(await crypto.subtle.exportKey('raw', this.keyPair.publicKey));
+      this.myPub = toB64Url(raw);
+      this.myCode = 'TPK1.' + this.myPub + '.' + String(rootHash || '').slice(0, 16);
+      return true;
+    }
+
+    /** Genera mi código (si aún no existe) para mostrarlo como QR. */
+    async start(rootHash) {
+      await this._ensureKeys(rootHash);
+      return this.myCode;
+    }
+
+    /** Procesa el código del otro. Devuelve {replyCode|null, verifyCode, mismatch, secret}. */
+    async accept(code, rootHash) {
+      const parts = String(code || '').trim().split('.');
+      if (parts[0] !== 'TPK1' || !parts[1]) throw new Error('Código de sincronización inválido');
+      const created = await this._ensureKeys(rootHash);
+      const peerRaw = fromB64Url(parts[1]);
+      const peerKey = await crypto.subtle.importKey('raw', peerRaw, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+      const bits = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: peerKey }, this.keyPair.privateKey, 256));
+      const pubs = [this.myPub, parts[1]].sort().join('|');
+      const secretBytes = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(toB64Url(bits) + '|' + pubs)));
+      const secret = toB64Url(secretBytes);
+      const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode('verify|' + secret)));
+      const verifyCode = String(((digest[0] << 8) | digest[1]) % 10000).padStart(4, '0');
+      const mismatch = !!(parts[2] && rootHash && parts[2] !== String(rootHash).slice(0, 16));
+      return { replyCode: created ? this.myCode : null, verifyCode, mismatch, secret, peerRoot: parts[2] || '' };
+    }
+
+    static save(secret) {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify({ s: secret, ts: Date.now() })); } catch (e) { /* sin almacenamiento */ }
+    }
+    static async load() {
+      try {
+        const o = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+        if (o && o.s) return { key: await hmacKey(o.s), ts: o.ts };
+      } catch (e) { /* ignorar */ }
+      return null;
+    }
+    static async keyFrom(secret) { return hmacKey(secret); }
+    static clear() { try { localStorage.removeItem(STORE_KEY); } catch (e) { /* noop */ } }
+  }
 
   const TP = root.TP = root.TP || {};
   TP.Sync = Sync;
   TP.Snapshot = Snapshot;
+  TP.OfflinePair = OfflinePair;
   TP.qr = { render: renderQR, scan: scanQR };
 })(window);
