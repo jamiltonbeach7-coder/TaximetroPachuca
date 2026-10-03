@@ -1571,6 +1571,7 @@ async function runIntegrityCheck() {
   integrityState.ok = res.ok;
   integrityState.rootHash = res.rootHash;
   integrityState.done = true;
+  integrityState.report = res.error ? 'No se pudo verificar: ' + res.error : res.ok ? 'Todos los archivos coinciden con integrity.json.\nHash raíz: ' + res.rootHash : 'Archivos con problemas:\n' + res.details.map(d => '• ' + d.path + ': ' + d.reason).join('\n') + '\n\nSi acabas de actualizar la app, cierra y abre de nuevo (caché).';
   const short = res.rootHash ? res.rootHash.slice(0, 8) : '';
   if (res.ok) {
     LINK.badge.textContent = `✅ ${short}`;
@@ -1610,6 +1611,7 @@ function createSyncLink() {
 }
 
 function initLinkListeners() {
+  LINK.badge.addEventListener('click', () => alert(integrityState.report || 'Verificando…'));
   document.getElementById('btnOpenLink').addEventListener('click', () => LINK.modal.classList.remove('hidden'));
   document.getElementById('btnCloseLinkModal').addEventListener('click', () => {
     if (stopScan) { stopScan(); stopScan = null; }

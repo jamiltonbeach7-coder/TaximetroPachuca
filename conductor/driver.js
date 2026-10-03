@@ -22,6 +22,7 @@ async function runIntegrityCheck() {
   const res = await TP.integrity.verify('../');
   integrityState.ok = res.ok;
   integrityState.rootHash = res.rootHash;
+  integrityState.report = res.error ? 'No se pudo verificar: ' + res.error : res.ok ? 'Todos los archivos coinciden con integrity.json.\nHash raíz: ' + res.rootHash : 'Archivos con problemas:\n' + res.details.map(d => '• ' + d.path + ': ' + d.reason).join('\n') + '\n\nSi acabas de actualizar la app, cierra y abre de nuevo (caché).';
   const b = $('integrityBadge');
   if (res.ok) {
     b.textContent = `✅ ${res.rootHash.slice(0, 8)}`;
@@ -222,6 +223,7 @@ $('btnOfflineScan').addEventListener('click', async () => {
 });
 TP.OfflinePair.load().then((p) => { if (p) { offlineKey = p.key; $('connBadge').textContent = '🔑 Sincronizado (QR)'; } });
 
+$('integrityBadge').addEventListener('click', () => alert(integrityState.report || 'Verificando…'));
 runIntegrityCheck();
 
 if ('serviceWorker' in navigator) {

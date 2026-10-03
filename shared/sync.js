@@ -138,7 +138,16 @@
       });
       this.pc.addEventListener('connectionstatechange', () => {
         const s = this.pc && this.pc.connectionState;
-        if (s === 'failed' || s === 'disconnected' || s === 'closed') {
+        clearTimeout(this._lostTimer);
+        if (s === 'connected') {
+          // Se recuperó de una desconexión transitoria
+          if (this.channel && this.channel.readyState === 'open' && !this.connected) { this.connected = true; this.opts.onState('connected'); }
+        } else if (s === 'disconnected') {
+          // 'disconnected' suele ser transitorio (cambio de red, ahorro de energía): damos 8 s de gracia
+          this._lostTimer = setTimeout(() => {
+            if (this.pc && this.pc.connectionState !== 'connected') { this.connected = false; this.opts.onState('disconnected'); }
+          }, 8000);
+        } else if (s === 'failed' || s === 'closed') {
           this.connected = false;
           this.opts.onState('disconnected');
         }
@@ -207,6 +216,7 @@
     /** Si no se conecta a tiempo (p. ej. redes distintas), avisa para ofrecer el modo sin conexión. */
     _watchTimeout(ms = 25000) {
       clearTimeout(this._timer);
+      clearTimeout(this._lostTimer);
       const pc = this.pc;
       this._timer = setTimeout(() => {
         if (this.pc === pc && !this.connected) this.opts.onState('timeout');
