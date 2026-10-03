@@ -426,7 +426,19 @@
     static clear() { try { localStorage.removeItem(STORE_KEY); } catch (e) { /* noop */ } }
   }
 
+  /** Identifica qué tipo de código es: 'offer' | 'answer' | 'offline' | 'snapshot' | 'invalid'. */
+  async function classify(raw) {
+    const code = String(raw || '').trim();
+    if (code.startsWith('TPK1.')) return 'offline';
+    if (code.startsWith('TPR')) return 'snapshot';
+    if (/^TP[012]\./.test(code)) {
+      try { return (await decodeDesc(code)).type === 'offer' ? 'offer' : 'answer'; } catch (e) { return 'invalid'; }
+    }
+    return 'invalid';
+  }
+
   const TP = root.TP = root.TP || {};
+  TP.classify = classify;
   TP.Sync = Sync;
   TP.Snapshot = Snapshot;
   TP.OfflinePair = OfflinePair;

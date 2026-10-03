@@ -105,6 +105,17 @@ function createSync() {
   });
 }
 
+// Cualquier botón de escaneo/pegado acepta cualquier tipo de código y lo manda al flujo correcto
+async function routeCode(raw) {
+  const code = String(raw || '').trim();
+  const kind = await TP.classify(code);
+  if (kind === 'offline') return applyOffline(code);
+  if (kind === 'offer') return acceptOffer(code);
+  if (kind === 'answer') return applyAnswer(code);
+  if (kind === 'snapshot') return loadSnapshot(code);
+  $('pairStatus').textContent = 'Código no reconocido. Pega o escanea un código que empiece con TP, TPK1. o TPR.';
+}
+
 async function acceptOffer(code) {
   try {
     if (!window.RTCPeerConnection) throw new Error('Este navegador no soporta WebRTC');
@@ -120,11 +131,11 @@ async function acceptOffer(code) {
   }
 }
 
-$('btnAcceptOffer').addEventListener('click', () => acceptOffer($('offerCode').value));
+$('btnAcceptOffer').addEventListener('click', () => routeCode($('offerCode').value));
 $('btnScanOffer').addEventListener('click', async () => {
   $('scanVideo').classList.remove('hidden');
   stopScan = await TP.qr.scan($('scanVideo'), (text) => {
-    $('scanVideo').classList.add('hidden'); stopScan = null; $('offerCode').value = text; acceptOffer(text);
+    $('scanVideo').classList.add('hidden'); stopScan = null; $('offerCode').value = text; routeCode(text);
   }, () => { $('scanVideo').classList.add('hidden'); $('pairStatus').textContent = 'No se pudo abrir la cámara; pega el código.'; });
 });
 $('btnCopyAnswer').addEventListener('click', () => { navigator.clipboard && navigator.clipboard.writeText($('answerCode').value); });
@@ -146,11 +157,11 @@ async function loadSnapshot(code) {
     st.className = 'text-xs text-red-400';
   }
 }
-$('btnLoadSnap').addEventListener('click', () => loadSnapshot($('snapCode').value));
+$('btnLoadSnap').addEventListener('click', () => routeCode($('snapCode').value));
 $('btnScanSnap').addEventListener('click', async () => {
   $('snapVideo').classList.remove('hidden');
   await TP.qr.scan($('snapVideo'), (text) => {
-    $('snapVideo').classList.add('hidden'); $('snapCode').value = text; loadSnapshot(text);
+    $('snapVideo').classList.add('hidden'); $('snapCode').value = text; routeCode(text);
   }, () => { $('snapVideo').classList.add('hidden'); $('snapStatus').textContent = 'No se pudo abrir la cámara; pega el código.'; });
 });
 
@@ -172,11 +183,11 @@ async function applyAnswer(code) {
   try { await sync.acceptAnswer(code); $('pairStatus').textContent = 'Paso 3 de 3: conectando…'; const iv = setInterval(() => { if (!sync || sync.connected) return clearInterval(iv); $('linkDiag').textContent = sync.getDiagnostics(); }, 1500); setTimeout(() => clearInterval(iv), 30000); }
   catch (e) { $('pairStatus').textContent = 'Código inválido: ' + e.message; }
 }
-$('btnApplyAns').addEventListener('click', () => applyAnswer($('ansIn').value));
+$('btnApplyAns').addEventListener('click', () => routeCode($('ansIn').value));
 $('btnScanAnswer').addEventListener('click', async () => {
   $('scanAnsVideo').classList.remove('hidden');
   await TP.qr.scan($('scanAnsVideo'), (text) => {
-    $('scanAnsVideo').classList.add('hidden'); applyAnswer(text);
+    $('scanAnsVideo').classList.add('hidden'); routeCode(text);
   }, () => { $('scanAnsVideo').classList.add('hidden'); $('pairStatus').textContent = 'No se pudo abrir la cámara; pega el código.'; });
 });
 
@@ -199,7 +210,7 @@ async function applyOffline(code) {
   try {
     if (!offlinePair) offlinePair = new TP.OfflinePair();
     const r = await offlinePair.accept(code, integrityState.rootHash);
-    if (r.mismatch && !confirm('La app del pasajero tiene una versión distinta (hash diferente). ¿Sincronizar de todos modos?')) {
+    if (r.mismatch && !confirm(`Las apps tienen versiones distintas (tú: ${integrityState.rootHash.slice(0, 8)}, pasajero: ${r.peerRoot.slice(0, 8)}). Lo normal es una caché vieja: cierra y abre de nuevo la app desactualizada. ¿Sincronizar de todos modos?`)) {
       offStatus('Sincronización cancelada: versiones distintas.'); offlinePair = null; return;
     }
     TP.OfflinePair.save(r.secret);
@@ -214,11 +225,11 @@ async function applyOffline(code) {
     offlinePair = null;
   } catch (e) { offStatus('No se pudo sincronizar: ' + e.message); }
 }
-$('btnOfflineApply').addEventListener('click', () => applyOffline($('offlineIn').value));
+$('btnOfflineApply').addEventListener('click', () => routeCode($('offlineIn').value));
 $('btnOfflineScan').addEventListener('click', async () => {
   $('offlineVideo').classList.remove('hidden');
   await TP.qr.scan($('offlineVideo'), (text) => {
-    $('offlineVideo').classList.add('hidden'); $('offlineIn').value = text; applyOffline(text);
+    $('offlineVideo').classList.add('hidden'); $('offlineIn').value = text; routeCode(text);
   }, () => { $('offlineVideo').classList.add('hidden'); offStatus('No se pudo abrir la cámara; pega el código.'); });
 });
 TP.OfflinePair.load().then((p) => { if (p) { offlineKey = p.key; $('connBadge').textContent = '🔑 Sincronizado (QR)'; } });

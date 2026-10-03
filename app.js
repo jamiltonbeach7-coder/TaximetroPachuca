@@ -1646,11 +1646,11 @@ function initLinkListeners() {
     try { await syncLink.acceptAnswer(code); setLinkStatus('Paso 3 de 3: conectando…'); const iv = setInterval(() => { if (!syncLink || syncLink.connected) return clearInterval(iv); showLinkDiag('pairing'); }, 1500); setTimeout(() => clearInterval(iv), 30000); }
     catch (e) { setLinkStatus('Código inválido: ' + e.message); }
   }
-  document.getElementById('btnApplyAnswer').addEventListener('click', () => applyAnswer(LINK.answer.value));
+  document.getElementById('btnApplyAnswer').addEventListener('click', () => routeCode(LINK.answer.value));
   document.getElementById('btnScanAnswer').addEventListener('click', async () => {
     LINK.video.classList.remove('hidden');
     stopScan = await window.TP.qr.scan(LINK.video, (text) => {
-      LINK.video.classList.add('hidden'); stopScan = null; applyAnswer(text);
+      LINK.video.classList.add('hidden'); stopScan = null; routeCode(text);
     }, () => { LINK.video.classList.add('hidden'); setLinkStatus('No se pudo abrir la cámara; pega el código.'); });
   });
 
@@ -1709,7 +1709,7 @@ function initLinkListeners() {
     try {
       if (!offlinePair) offlinePair = new window.TP.OfflinePair();
       const r = await offlinePair.accept(code, integrityState.rootHash);
-      if (r.mismatch && !confirm('La app del conductor tiene una versión distinta (hash diferente). ¿Sincronizar de todos modos?')) {
+      if (r.mismatch && !confirm(`Las apps tienen versiones distintas (tú: ${integrityState.rootHash.slice(0, 8)}, conductor: ${r.peerRoot.slice(0, 8)}). Lo normal es una caché vieja: cierra y abre de nuevo la app desactualizada. ¿Sincronizar de todos modos?`)) {
         offStatus('Sincronización cancelada: versiones distintas.'); offlinePair = null; return;
       }
       window.TP.OfflinePair.save(r.secret);
@@ -1725,17 +1725,28 @@ function initLinkListeners() {
       offlinePair = null;
     } catch (e) { offStatus('No se pudo sincronizar: ' + e.message); }
   }
-  document.getElementById('btnOfflineApply').addEventListener('click', () => applyOffline(document.getElementById('offlineIn').value));
+  document.getElementById('btnOfflineApply').addEventListener('click', () => routeCode(document.getElementById('offlineIn').value));
   document.getElementById('btnOfflineScan').addEventListener('click', async () => {
     const v = document.getElementById('offlineVideo');
     v.classList.remove('hidden');
     stopScan = await window.TP.qr.scan(v, (text) => {
-      v.classList.add('hidden'); stopScan = null; document.getElementById('offlineIn').value = text; applyOffline(text);
+      v.classList.add('hidden'); stopScan = null; document.getElementById('offlineIn').value = text; routeCode(text);
     }, () => { v.classList.add('hidden'); offStatus('No se pudo abrir la cámara; pega el código.'); });
   });
   window.TP.OfflinePair.load().then((p) => { if (p) { offlineKey = p.key; refreshSyncUI(); } });
 
   // Flujo inverso: el conductor genera la invitación y el pasajero la escanea
+  // Cualquier botón de escaneo/pegado acepta cualquier tipo de código y lo manda al flujo correcto
+  async function routeCode(raw) {
+    const code = String(raw || '').trim();
+    const kind = await window.TP.classify(code);
+    if (kind === 'offline') return applyOffline(code);
+    if (kind === 'offer') return acceptDriverOffer(code);
+    if (kind === 'answer') return applyAnswer(code);
+    if (kind === 'snapshot') return setLinkStatus('Ese código es un resumen de viaje: solo el conductor lo lee.');
+    setLinkStatus('Código no reconocido. Pega o escanea un código que empiece con TP o TPK1.');
+  }
+
   async function acceptDriverOffer(code) {
     try {
       if (!window.RTCPeerConnection) throw new Error('Este navegador no soporta WebRTC');
@@ -1751,12 +1762,12 @@ function initLinkListeners() {
       setTimeout(() => clearInterval(iv), 60000);
     } catch (e) { setLinkStatus('Invitación inválida: ' + e.message); }
   }
-  document.getElementById('btnAcceptOffer').addEventListener('click', () => acceptDriverOffer(document.getElementById('offerCode').value));
+  document.getElementById('btnAcceptOffer').addEventListener('click', () => routeCode(document.getElementById('offerCode').value));
   document.getElementById('btnScanOffer').addEventListener('click', async () => {
     const v = document.getElementById('scanOfferVideo');
     v.classList.remove('hidden');
     stopScan = await window.TP.qr.scan(v, (text) => {
-      v.classList.add('hidden'); stopScan = null; document.getElementById('offerCode').value = text; acceptDriverOffer(text);
+      v.classList.add('hidden'); stopScan = null; document.getElementById('offerCode').value = text; routeCode(text);
     }, () => { v.classList.add('hidden'); setLinkStatus('No se pudo abrir la cámara; pega el código.'); });
   });
   document.getElementById('btnCopyAnswerOut').addEventListener('click', () => {
